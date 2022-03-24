@@ -1,0 +1,5 @@
+{
+  "name": "ifconfig Config",
+  "config": {"url":"https://ifconfig.co/ip"},
+  "connector_id": "1"
+}

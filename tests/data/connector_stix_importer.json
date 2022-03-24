@@ -1,0 +1,6 @@
+{
+  "connector_id": "a1bebebc-a93a-44a4-b19c-1de060d2c12e",
+  "name": "Stix Importer",
+  "queue": "stix_importer",
+  "type": "STIX_IMPORTER"
+}

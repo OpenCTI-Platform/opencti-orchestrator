@@ -1,0 +1,5 @@
+{
+  "name": "HttpBin Config",
+  "config": {"url":"https://httbin.org/ip"},
+  "connector_id": "1"
+}

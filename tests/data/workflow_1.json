@@ -1,0 +1,9 @@
+{
+  "name": "Simple Workflow",
+  "root_node": "config-1",
+  "node_dependencies": {
+    "config-1": ["config-3"],
+    "config-3": ["config-4"]
+  },
+  "API token": "123123"
+}
