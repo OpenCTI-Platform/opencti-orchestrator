@@ -1,76 +1,164 @@
 import json
+import uuid
+from enum import Enum
+from typing import List, Optional
 
-from flask import Blueprint, request, jsonify, url_for, g
-from app.extensions import db
-from app.models import Workflow, ConnectorRunConfig, ConnectorMessage, ConnectorInstance, Connector
-from app.schemas import workflows_schema, workflow_schema
-import pika
+from flask import Blueprint, request, current_app
+from pydantic.types import Json
+from stix2 import Bundle
 
-
-workflow_page = Blueprint('workflow', __name__)
-
-
-@workflow_page.route('')
-def get_all():
-    workflows = Workflow.query.all()
-    return workflows_schema.dumps(workflows)
-
-
-@workflow_page.route('/<int:id>')
-def get(id: int):
-    workflow = Workflow.query.get_or_404(id)
-    return workflow_schema.dump(workflow)
+from pycti import ConnectorType
+from pydantic.main import BaseModel
+from pycti.connector.v2.connectors.utils import (
+    State,
+    Result,
+    RunContainer,
+    RunSchema,
+    ExecutionTypeEnum,
+    WorkflowSchema,
+)
 
 
-@workflow_page.route('/', methods=['POST'])
+from app.core.workflow import launch_run_instance
+from app.extensions import elastic, scheduler
+from app.models import Workflow
+from elasticsearch_dsl.exceptions import ValidationException
+
+from app.resources.utils import get_json
+
+workflow_page = Blueprint("workflow", __name__)
+
+
+# class WorkflowSchema(BaseModel):
+#     name: str
+#     jobs: List[str]
+#     token: str
+#     execution_type: ExecutionTypeEnum
+#     execution_args: Optional[str]
+# execution: {
+#   type: "schedule/triggered"
+#   schedule: "@hourly/23:11 @week/@now"
+# }
+
+
+# @workflow_page.route('')
+# def get_all():
+#     workflows = {} # Workflow.query.all()
+#     # TODO implement
+#     return workflows, 200
+#
+#
+
+
+@workflow_page.route("/<string:workflow_id>")
+def get(workflow_id: str):
+    workflow = Workflow.get(id=workflow_id)
+    if not workflow:
+        return "", 404
+    else:
+        return workflow.to_dict(include_meta=True), 200
+
+
+@workflow_page.route("/", methods=["POST"])
 def post():
-    # print(request.json)
-    json_data = json.loads(request.json)
+    # json_data = request.get_json(force=True)
+    json_data = get_json(request)
+    # mapper = {
+    #     ConnectorType.EXTERNAL_IMPORT: Job,
+    #     ConnectorType.INTERNAL_IMPORT_FILE: InternalImportJob,
+    #     ConnectorType.INTERNAL_ENRICHMENT: InternalEnrichmentJob,
+    #     ConnectorType.INTERNAL_EXPORT_FILE: InternalExportJob,
+    #     ConnectorType.STREAM: Job,
+    #     "STIX_IMPORTER": StixImportJob,
+    # }
+    # TODO check execution type
 
-    connector_instance_id = request.json.get('connector_instance', None)
-    print(connector_instance_id)
-    connector_instance = ConnectorInstance.query.get_or_404(connector_instance_id)
-    _send_message(connector_instance.connector.queue)
-    return "", 201
+    workflow = Workflow(**json_data)
+    try:
+        workflow_meta = workflow.save(return_doc_meta=True)
+    except ValidationException as e:
+        return str(e), 400
+
+    return workflow.to_dict(include_meta=True), 201
 
 
-@workflow_page.route('/<int:id>', methods=['DELETE'])
-def delete(id):
+@workflow_page.route("/<string:workflow_id>", methods=["DELETE"])
+def delete(workflow_id: str):
     pass
 
 
-@workflow_page.route('/run/<int:id>', methods=['GET'])
-def run(workflow_id):
-    pass
+@workflow_page.route("/<string:workflow_id>/run", methods=["POST"])
+def run(workflow_id: str):
+    json_data = get_json(request)
+    # TODO this is a stupid workaround
+    # json_data["parameters"] = str(json_data["parameters"])
 
+    run_schema = RunSchema(**json_data)
+    workflow = Workflow.get(id=workflow_id)
+    if workflow is None:
+        return "Workflow not found", 400
 
-def _send_message(connector_queue):
-    pika_credentials = pika.PlainCredentials('SjIHMjmnYyRtuDf', 'EVOCuAGfhOEYmmt')
-    connection = pika.BlockingConnection(
-        pika.ConnectionParameters(
-            host='rabbitmq',
-            port=5672,
-            credentials=pika_credentials
+    # Create run instance
+    if workflow.execution_type == ExecutionTypeEnum.triggered.value:
+        launch_run_instance(run_schema, workflow)
+    elif workflow.execution_type == ExecutionTypeEnum.scheduled.value:
+        run_id = str(
+            uuid.uuid4().hex
+        )  # TODO maybe find some other way Workflow_<counter>?
+        scheduler.add_job(
+            func=launch_run_instance,
+            trigger="interval",
+            seconds=6,
+            args=[run_schema, workflow],
+            id=run_id,
         )
-    )
-    channel = connection.channel()
+    else:
+        return "Fail, unsupported execution type", 400
 
-    channel.queue_declare(queue=connector_queue, durable=True)
-    channel.basic_publish(
-        exchange='',
-        routing_key=connector_queue,
-        body=b"running",
-        properties=pika.BasicProperties(
-            delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE
-        ))
-    connection.close()
+    return "Running", 201
 
-# @workflow_page.route('/<int:id>')
-# def get(id):
-#     workflow = Workflow.query.get_or_404(id)
-#     return workflow_schema.dump(workflow)
+
+# @workflow_page.route("/run/<int:workflow_id>", methods=["GET"])
+# def run(workflow_id):
+#     #     _send_message(connector_instance.connector.queue)
+#     pass
+
+# config_id = json_data["config_id"]
+# config = ConnectorRunConfig.get(id=config_id, using=elastic)
+# connector = Connector.get(id=config.connector_id, using=elastic)
+# step = mapper.get(connector.type)
+# workflow = Workflow(
+#     name="My workflow?",
+#     applicant_id="???",  # where do I get it from?
+#     worksteps=[
+#         step(config_id=json_data["config_id"], **json_data),
+#         StixImportJob(),
+#     ],
+# )
 #
+# if current_app.config["BROKER"] == "STDOUT":
+#     broker = _send_stdout_message
+# elif current_app.config["BROKER"] == "PIKA":
+#     broker = _send_pika_message
+# else:
+#     return "unknown broker", 400
 #
+# broker(workflow)
+
+# result = Connector. \
+#     search(using=elastic.connection). \
+#     filter('term', uuid=json_data['uuid']). \
+#     execute()
+# TODO check if name is unique and if connector_id exists
+# if len(result) > 0:
+#     return f"{{'uuid': 'value \"{json_data['uuid']}\" already exists}}", 400
+
+# try:
+#     workflow_meta = workflow.save(using=elastic.connection, return_doc_meta=True)
+# except ValidationException as e:
+#     return str(e), 400
+
+
 # @workflow_page.route('/', methods=['POST'])
 # def new_workflow():
 #     # Parse

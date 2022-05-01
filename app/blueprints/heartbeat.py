@@ -1,27 +1,32 @@
 from flask import Blueprint, request
 from datetime import datetime
+
+from app.extensions import elastic
 from app.models import ConnectorInstance
-from app.extensions import db
+
+# from app.extensions import db
 from sqlalchemy.sql import func
 
 
-heartbeat_page = Blueprint('heartbeat', __name__)
+heartbeat_page = Blueprint("heartbeat", __name__)
 
 
-@heartbeat_page.route('/<int:instance_id>', methods=['PUT'])
+@heartbeat_page.route("/<string:instance_id>", methods=["PUT"])
 def update(instance_id: int):
-    connector_instance = ConnectorInstance.query.get_or_404(instance_id)
-    connector_instance.last_seen = func.now()
-    db.session.add(connector_instance)
-    db.session.commit()
+    instance = ConnectorInstance.get(id=instance_id)
+    if not instance:
+        return "", 404
+    instance.update(last_seen=datetime.now())
     return "OK", 201
 
 
-@heartbeat_page.route('/<int:instance_id>', methods=['DELETE'])
+@heartbeat_page.route("/<string:instance_id>", methods=["DELETE"])
 def delete(instance_id: int):
-    connector_instance = ConnectorInstance.query.get_or_404(instance_id)
-    db.session.delete(connector_instance)
-    db.session.commit()
+    instance = ConnectorInstance.get(id=instance_id)
+    if not instance:
+        return "", 404
+
+    instance.delete()
     return "", 204
 
 

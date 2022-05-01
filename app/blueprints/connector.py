@@ -1,96 +1,138 @@
+# from app.schemas import connector_schema, connectors_schema
 import json
-
-from app import RABBITMQ_USER, RABBITMQ_PASSWORD, RABBITMQ_URL
-from app.extensions import db, scheduler
-from app.models import Connector, ConnectorInstance
-from app.schemas import connector_schema, connectors_schema
-from flask import Blueprint, request
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.sql import func
 from datetime import datetime
 
-connector_page = Blueprint('connector', __name__)
+from elasticsearch_dsl import Q
+from elasticsearch_dsl.exceptions import ValidationException
+from flask import Blueprint, request, current_app
+
+from app.extensions import elastic
+from app.models import Connector, ConnectorInstance
+from pycti.connector.v2.connectors.utils import ConnectorIdentification
+from app.resources.utils import get_json
+
+connector_page = Blueprint("connector", __name__)
 
 
-@connector_page.route('')
+@connector_page.route("")
 def get_all():
-    connectors = Connector.query.all()
-    return connectors_schema.dumps(connectors)
+    connectors = {}  # Connector.query.all()
+    # TODO implement
+    # return connectors_schema.dumps(connectors)
+    return connectors, 200
 
 
-@connector_page.route('/<int:id>')
-def get(connector_id: int):
-    connector = Connector.query.get_or_404(connector_id)
-    return connector_schema.dump(connector)
-
-
-@connector_page.route('/', methods=['POST'])
-def post():
-    try:
-        json_data = json.loads(request.json)
-    except ValueError as e:
-        return str(e), 400
-
-    result = connector_schema.validate(json_data)
-    if result:
-        return result, 400
-
-    existing_connector = Connector.query.filter_by(
-        name=json_data["name"],
-        uuid=json_data["uuid"],
-        queue=json_data["queue"]
-    ).first()
-    if not existing_connector:
-        try:
-            connector = Connector(**json_data)
-            db.session.add(connector)
-            db.session.commit()
-        except IntegrityError as e:
-            return str(e), 400
+@connector_page.route("/<string:connector_id>")
+def get(connector_id: str):
+    connector = Connector.get(id=connector_id)
+    if not connector:
+        return "", 404
     else:
-        print(f"{json_data['name']} connector already exists")
-        connector = existing_connector
+        return connector.to_dict(), 200
+
+
+@connector_page.route("/", methods=["POST"])
+def post():
+    json_data = get_json(request)
+
+    connector = Connector(**json_data)
+
+    single_result = (
+        Connector.search()
+        .query(
+            "bool",
+            filter=[
+                Q("term", uuid=connector.uuid)
+                | Q("term", name=connector.name)
+                | Q("term", queue=connector.queue)
+            ],
+        )
+        .exclude(
+            "bool",
+            filter=[
+                Q("term", uuid=connector.uuid)
+                & Q("term", name=connector.name)
+                & Q("term", queue=connector.queue)
+            ],
+        )
+        .execute()
+    )
+    if len(single_result) > 0:
+        result = [f"Connector({i.uuid}, {i.name}, {i.queue})" for i in single_result]
+        return f"{{Chosen fields are not unique: {result} }}", 400
+
+    result = (
+        Connector.search()
+        .query(
+            "bool",
+            filter=[
+                Q("term", uuid=connector.uuid)
+                & Q("term", name=connector.name)
+                & Q("term", queue=connector.queue)
+            ],
+        )
+        .execute()
+    )
+    if len(result) > 1:
+        summary = [f"Connector({i.uuid}, {i.name}, {i.queue})" for i in result]
+        return (
+            f"More than 1 connector registered, please delete one of those ids {summary}",
+            400,
+        )
+    elif len(result) == 1:
+        # Using existing connector, only create new instance
+        connector_id = result[0].meta["id"]
+        connector = Connector.get(id=result[0].meta["id"])
+    else:
+        # Create new connector
+        try:
+            connector_info_meta = connector.save(return_doc_meta=True)
+            connector_id = connector_info_meta["_id"]
+        except ValidationException as e:
+            return str(e), 400
 
     connector_instance = ConnectorInstance(
-        last_seen=func.now(),
-        connector_id=connector.id
+        last_seen=datetime.now(), connector_id=connector_id
     )
-    db.session.add(connector_instance)
-    db.session.commit()
+    connector_instance_meta = connector_instance.save(return_doc_meta=True)
 
     config = {
         "environment": {
             "broker": {
                 "type": "pika",
-                "user": RABBITMQ_USER,
-                "password": RABBITMQ_PASSWORD,
-                "host": RABBITMQ_URL
+                "user": current_app.config["RABBITMQ_USER"],
+                "password": current_app.config["RABBITMQ_PASSWORD"],
+                "host": current_app.config["RABBITMQ_HOST"],
             }
         },
-        "connector_instance": connector_instance.id,
-        "connector": connector_schema.dump(connector)
+        "connector_instance": connector_instance_meta["_id"],
+        "connector": connector.to_dict(include_meta=True),
     }
     return config, 201
 
 
-@connector_page.route('/<int:id>', methods=['DELETE'])
-def delete(connector_id: int):
-    result = Connector.query.delete_or_404(id=connector_id)
-    return result, 204
+@connector_page.route("/<string:connector_id>", methods=["DELETE"])
+def delete(connector_id: str):
+    connector = Connector.get(id=connector_id)
+    if not connector:
+        return "", 404
+
+    connector.delete()
+    return "", 204
 
 
-@connector_page.route('/schedule/', methods=['POST'])
-def schedule():
-    connector_id = request.json['connector']
-
-    scheduler.add_job(func=dummy_func,
-                      trigger="interval",
-                      seconds=1,
-                      id="test job 2",
-                      name="test job 2",
-                      replace_existing=True, )
-    return "scheduled", 200
-
-def dummy_func():
-    dat: str = str(datetime.now())
-    print(f"executing scheduled {dat}")
+# @connector_page.route('/schedule/', methods=['POST'])
+# def schedule():
+#     connector_id = request.json['connector']
+#
+#     scheduler.add_job(func=dummy_func,
+#                       trigger="interval",
+#                       seconds=1,
+#                       id="test job 2",
+#                       name="test job 2",
+#                       replace_existing=True, )
+#     return "scheduled", 200
+#
+# def dummy_func():
+#     dat: str = str(datetime.now())
+#     print(f"executing scheduled {dat}")
