@@ -1,9 +1,34 @@
-from app import create_app
-from app.extensions import db
+from app import create_app, INDEX_NAME
+from app.extensions import elastic
+from flask.cli import FlaskGroup
 
-# Call the application factory function to construct a Flask application
-# instance using the development configuration
-app = create_app('flask.cfg')
-with app.app_context() as context:
-    db.drop_all()
-    db.create_all()
+from app.models import (
+    Connector,
+    ConnectorRunConfig,
+    ConnectorInstance,
+    Run,
+    Workflow,
+    BaseDocument,
+)
+
+app = create_app()
+cli = FlaskGroup(create_app=create_app)
+
+
+@cli.command("recreate_db")
+def recreate_db():
+    BaseDocument._index.delete(ignore=[400, 404], using=elastic.connection)
+
+    Connector.init(using=elastic.connection)
+    ConnectorInstance.init(using=elastic.connection)
+    ConnectorRunConfig.init(using=elastic.connection)
+    Workflow.init(using=elastic.connection)
+    Run.init(using=elastic.connection)
+
+    elastic.connection.indices.refresh(index=INDEX_NAME)
+
+    print("Flushed database")
+
+
+if __name__ == "__main__":
+    cli()
