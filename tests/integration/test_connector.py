@@ -1,10 +1,261 @@
-import pytest
+import json
+import time
+import uuid
+from typing import List
 
-def test_connector_list(test_client):
+import pytest
+from elasticsearch_dsl import Search
+from pycti import ConnectorType
+from pydantic.main import BaseModel
+
+from app import INDEX_NAME
+from pycti.connector.v2.connectors.utils import (
+    RunSchema,
+    RunUpdateSchema,
+    State,
+    Result,
+    WorkflowSchema,
+    ExecutionTypeEnum,
+    ConnectorIdentification,
+    ConnectorRunConfigSchema,
+)
+from app.extensions import elastic
+
+
+def create_connector_and_config_stix(test_client) -> str:
+    # Register Connector
+    stix_worker = ConnectorIdentification(
+        uuid=str(uuid.uuid4()),
+        name="StixWorker",
+        type="STIX_IMPORT",
+        queue="stix_import",
+    )
+    response = test_client.post("/connector/", json=stix_worker.json())
+    print(response)
+    stix_worker = json.loads(response.data.decode())
+    print(response.data.decode())
+
+    # Register Connector Config
+    stix_worker_config = ConnectorRunConfigSchema(
+        connector_id=stix_worker["connector"]["id"], name="StixWorker Config", config={}
+    )
+    response = test_client.post("/config/", json=stix_worker_config.json())
+    stix_config = json.loads(response.data.decode())
+    return stix_config["id"]
+
+
+def create_connector_and_config_external_import(test_client) -> str:
+    class TestExternalImportRunConfig(BaseModel):
+        ip: str
+
+    # Register Connector
+    external_import = ConnectorIdentification(
+        uuid=str(uuid.uuid4()),
+        name="ExternalImport",
+        type=ConnectorType.EXTERNAL_IMPORT.value,
+        queue="stix_import",
+    )
+    response = test_client.post("/connector/", json=external_import.json())
+    external_import = json.loads(response.data.decode())
+
+    # Register Connector Config
+    external_import_config = ConnectorRunConfigSchema(
+        connector_id=external_import["connector"]["id"],
+        name="EI Import 192.168.14.1",
+        config=TestExternalImportRunConfig(ip="192.168.14.1"),
+    )
+    response = test_client.post("/config/", json=external_import_config.json())
+    ei_config = json.loads(response.data.decode())
+    return ei_config["id"]
+
+
+def create_triggered_workflow(configs: List, test_client) -> str:
+    # Create Workflow
+    workflow = WorkflowSchema(
+        name="Test Workflow Trigered",
+        jobs=configs,
+        execution_type=ExecutionTypeEnum.triggered,
+        execution_args="",
+        token="123441",
+    )
+    response = test_client.post("/workflow/", json=workflow.json())
+    workflow_config = json.loads(response.data.decode())
+    return workflow_config["id"]
+
+
+def create_scheduled_workflow(configs: List, test_client) -> str:
+    # Create Workflow
+    workflow = WorkflowSchema(
+        name="Test Workflow Scheduled",
+        jobs=configs,
+        execution_type=ExecutionTypeEnum.scheduled,
+        execution_args="",
+        token="123441",
+    )
+    response = test_client.post("/workflow/", json=workflow.json())
+    workflow_config = json.loads(response.data.decode())
+    return workflow_config["id"]
+
+
+@pytest.fixture()
+def clear_test_suite(test_client):
+    s = Search(index=INDEX_NAME, using=elastic.connection).query("match_all")
+    try:
+        response = s.delete(refresh=True)
+        response = [i for i in response]
+        print(f"cleared {response}")
+    except:
+        pass
+
+    # elastic.connection.indices.refresh(index=INDEX_NAME)
+    # elastic.connection. refresh(index=INDEX_NAME)
+
+    yield
+    s = Search(index=INDEX_NAME, using=elastic.connection).query("match_all")
+    try:
+        response = s.delete(refresh=True)
+        response = [i for i in response]
+        print(f"cleared {response}")
+    except:
+        pass
+
+    # elastic.connection.indices.refresh(index=INDEX_NAME)
+    # elastic.connection.refresh(index=INDEX_NAME)
+
+
+def update_status(
+    test_client, config_id: str, run_id: str, status: State, result: Result = None
+) -> int:
+    update_schema = RunUpdateSchema(
+        command="job_status",
+        parameters={"config_id": config_id, "status": status, "result": result},
+    )
+    response = test_client.put(f"/run/{run_id}", json=update_schema.json())
+    print(response.data.decode())
+    return response.status_code
+
+
+def test_triggered_workflow(test_client, caplog, clear_test_suite):
     """
     GIVEN a Flask application configured for testing
     WHEN the '/login' page is requested (GET)
     THEN check the response is valid
     """
-    response = test_client.get('/connector/')
+    stix_config_id = create_connector_and_config_stix(test_client)
+    external_import_config_id = create_connector_and_config_external_import(test_client)
+    workflow_id = create_triggered_workflow(
+        [stix_config_id, external_import_config_id], test_client
+    )
+
+    # Setup Workflow Run
+    workflow_run = RunSchema(
+        workflow_id=workflow_id,
+        work_id="",
+        applicant_id="",
+        arguments="{}",
+    )
+    response = test_client.post(
+        f"/workflow/{workflow_id}/run", json=workflow_run.json()
+    )
+    assert response.status_code == 201
+
+    time.sleep(1)
+    run_id = None
+    for record in caplog.records:
+        if "Received RunContainer" in record.message:
+            run_container = json.loads(record.message.split("RunContainer: ")[1])
+            run_id = run_container["run_id"]
+
+    assert run_id is not None, "Could not find Run ID in log output"
+
+    # Set connector status to running
+    response_code = update_status(
+        test_client, external_import_config_id, run_id, State.running
+    )
+    assert response_code == 200
+
+    # Set connector status to finished and success
+    response_code = update_status(
+        test_client, external_import_config_id, run_id, State.finished, Result.success
+    )
+    assert response_code == 200
+
+    # Set connector status to running
+    response_code = update_status(test_client, stix_config_id, run_id, State.running)
+    assert response_code == 200
+
+    # Set connector status to finished and success
+    response_code = update_status(
+        test_client, stix_config_id, run_id, State.finished, Result.success
+    )
+    assert response_code == 200
+
+    response = test_client.get(f"/run/{run_id}")
     assert response.status_code == 200
+    run = json.loads(response.data.decode())
+
+    assert run["status"] == State.finished.value
+    assert run["result"] == Result.success.value
+
+
+def test_scheduled_workflow(test_client, caplog, clear_test_suite):
+    """
+    GIVEN a Flask application configured for testing
+    WHEN the '/login' page is requested (GET)
+    THEN check the response is valid
+    """
+    stix_config_id = create_connector_and_config_stix(test_client)
+    external_import_config_id = create_connector_and_config_external_import(test_client)
+    workflow_id = create_scheduled_workflow(
+        [stix_config_id, external_import_config_id], test_client
+    )
+
+    # Setup Workflow Run
+    workflow_run = RunSchema(
+        workflow_id=workflow_id,
+        work_id="",
+        applicant_id="",
+        arguments="{}",
+    )
+    response = test_client.post(
+        f"/workflow/{workflow_id}/run", json=workflow_run.json()
+    )
+    assert response.status_code == 201
+
+    time.sleep(8)
+    run_id = None
+    for record in caplog.records:
+        if "Received RunContainer" in record.message:
+            run_container = json.loads(record.message.split("RunContainer: ")[1])
+            run_id = run_container["run_id"]
+
+    assert run_id is not None, "Could not find Run ID in log output"
+
+    # Set connector status to running
+    response_code = update_status(
+        test_client, external_import_config_id, run_id, State.running
+    )
+    assert response_code == 200
+
+    # Set connector status to finished and success
+    response_code = update_status(
+        test_client, external_import_config_id, run_id, State.finished, Result.success
+    )
+    assert response_code == 200
+
+    # Set connector status to running
+    response_code = update_status(test_client, stix_config_id, run_id, State.running)
+    assert response_code == 200
+
+    # Set connector status to finished and success
+    response_code = update_status(
+        test_client, stix_config_id, run_id, State.finished, Result.success
+    )
+    assert response_code == 200
+
+    response = test_client.get(f"/run/{run_id}")
+    assert response.status_code == 200
+    run = json.loads(response.data.decode())
+
+    assert run["status"] == State.finished.value
+    assert run["result"] == Result.success.value
