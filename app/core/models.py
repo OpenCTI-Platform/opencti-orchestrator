@@ -2,7 +2,17 @@ import json
 
 from elasticsearch_dsl import Document, Date, Keyword, Object, InnerDoc, Nested
 from pycti import ConnectorType
-from pycti.connector.v2.connectors.utils import State, RunContainer, RunSchema, Job
+from pycti.connector.v2.libs.orchestrator_schemas import (
+    State,
+    RunContainer,
+    RunCreate,
+    Job,
+    Connector as ConnectorSchema,
+    Config as ConfigSchema,
+    Workflow as WorkflowSchema,
+    Run as RunSchema,
+)
+from pydantic import BaseModel
 
 from app import INDEX_NAME
 from app.extensions import elastic
@@ -11,7 +21,13 @@ from app.modules.elasticsearch import ChoicesKeyword
 connectorUniqueSchema = ["uuid", "name", "queue"]
 
 
+class ErrorMessage(BaseModel):
+    message: str
+
+
 class BaseDocument(Document):
+    orm_class = None
+
     def to_dict(self, include_meta=False, skip_empty=True):
         d = super(Document, self).to_dict(skip_empty=skip_empty)
         if not include_meta:
@@ -51,6 +67,9 @@ class Connector(BaseDocument):
         required=True, choices=[e.value for e in ConnectorType] + ["STIX_IMPORT"]
     )
 
+    def to_orm(self):
+        return ConnectorSchema(**self.to_dict(include_meta=True))
+
 
 class ConnectorInstance(BaseDocument):
     last_seen = Date(required=True)
@@ -61,11 +80,14 @@ class ConnectorInstance(BaseDocument):
 connectorRunConfigUniqueSchema = ["name"]
 
 
-class ConnectorRunConfig(BaseDocument):
+class RunConfig(BaseDocument):
     name = Keyword(required=True)  # TODO make secondary key or something
     config = Object(enabled=False)
     # Single corresponding Connector
     connector_id = Keyword(required=True)
+
+    def to_orm(self):
+        return ConfigSchema(**self.to_dict(include_meta=True))
 
 
 class JobStatus(InnerDoc):
@@ -90,7 +112,7 @@ class Run(BaseDocument):
         workflow = Workflow.get(id=self.workflow_id)
         job_list = []
         for config_id in workflow.jobs:
-            connector_config = ConnectorRunConfig.get(id=config_id)
+            connector_config = RunConfig.get(id=config_id)
             connector = Connector.get(id=connector_config.connector_id)
             queue = connector.queue
             job = Job(config_id=config_id, queue=queue)
@@ -108,6 +130,9 @@ class Run(BaseDocument):
         )
         return run_container
 
+    def to_orm(self):
+        return RunSchema(**self.to_dict(include_meta=True))
+
 
 class Workflow(BaseDocument):
     # name = Keyword(required=True) # TODO make unique
@@ -118,7 +143,7 @@ class Workflow(BaseDocument):
     execution_type = Keyword(required=True)
     execution_args = Keyword(required=False)
 
-    def create_run_instance(self, run_schema: RunSchema) -> Run:
+    def create_run_instance(self, run_schema: RunCreate) -> Run:
         # TODO this won't work, because meta['id'] of the Run doesn't
         # exist yet
         job_status = []
@@ -139,6 +164,9 @@ class Workflow(BaseDocument):
         run.save()
 
         return run
+
+    def to_orm(self):
+        return WorkflowSchema(**self.to_dict(include_meta=True))
 
 
 # class Workflow(db.Model):

@@ -1,33 +1,53 @@
-from flask import Blueprint, request
 from datetime import datetime
+from flask import make_response, jsonify
+from flask_openapi3 import APIBlueprint, Tag
+from pydantic import BaseModel, Field
 
-from app.extensions import elastic
-from app.models import ConnectorInstance
+from app.core.models import ConnectorInstance
 
 # from app.extensions import db
-from sqlalchemy.sql import func
+
+tag = Tag(name="heartbeat", description="Heartbeat Management")
+heartbeat_page = APIBlueprint(
+    "heartbeat", __name__, url_prefix="/heartbeat", abp_tags=[tag]
+)
 
 
-heartbeat_page = Blueprint("heartbeat", __name__)
+class HeartBeatPath(BaseModel):
+    instance_id: str = Field("instance_id", description="ID of connector instance")
 
 
-@heartbeat_page.route("/<string:instance_id>", methods=["PUT"])
-def update(instance_id: int):
-    instance = ConnectorInstance.get(id=instance_id)
+class HeartBeatResponse(BaseModel):
+    message: str = Field("ok", description="Exception Information")
+
+
+@heartbeat_page.put(
+    "/<string:instance_id>",
+    summary="Update heartbeat for connector instance",
+    description="Update heartbeat and set the last_seen value to datetime.now()",
+    responses={"201": HeartBeatResponse, "404": HeartBeatResponse},
+)
+def update(path: HeartBeatPath):
+    instance = ConnectorInstance.get(id=path.instance_id)
     if not instance:
-        return "", 404
+        return make_response(jsonify(message="Not Found"), 404)
     instance.update(last_seen=datetime.now())
-    return "OK", 201
+    return make_response(jsonify(message="OK"), 201)
 
 
-@heartbeat_page.route("/<string:instance_id>", methods=["DELETE"])
-def delete(instance_id: int):
-    instance = ConnectorInstance.get(id=instance_id)
+@heartbeat_page.delete(
+    "/<string:instance_id>",
+    summary="Delete connector instance",
+    description="Delete connector instance at shutdown",
+    responses={"204": HeartBeatResponse, "404": HeartBeatResponse},
+)
+def delete(path: HeartBeatPath):
+    instance = ConnectorInstance.get(id=path.instance_id)
     if not instance:
-        return "", 404
+        return make_response(jsonify(message="Not Found"), 404)
 
     instance.delete()
-    return "", 204
+    return make_response(jsonify(), 204)
 
 
 # TODO implement heartbeat service, to check current status

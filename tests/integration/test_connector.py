@@ -9,39 +9,42 @@ from pycti import ConnectorType
 from pydantic.main import BaseModel
 
 from app import INDEX_NAME
-from pycti.connector.v2.connectors.utils import (
-    RunSchema,
-    RunUpdateSchema,
+from pycti.connector.v2.libs.orchestrator_schemas import (
+    RunCreate,
+    RunUpdate,
+    Run,
+    RunContainer,
     State,
     Result,
-    WorkflowSchema,
+    WorkflowCreate,
+    Workflow,
     ExecutionTypeEnum,
-    ConnectorIdentification,
-    ConnectorRunConfigSchema,
+    ConnectorCreate,
+    Connector,
+    ConfigCreate,
+    Config
 )
 from app.extensions import elastic
 
 
 def create_connector_and_config_stix(test_client) -> str:
     # Register Connector
-    stix_worker = ConnectorIdentification(
+    stix_worker = ConnectorCreate(
         uuid=str(uuid.uuid4()),
         name="StixWorker",
         type="STIX_IMPORT",
         queue="stix_import",
     )
-    response = test_client.post("/connector/", json=stix_worker.json())
-    print(response)
+    response = test_client.post("/connector/", json=stix_worker.dict())
     stix_worker = json.loads(response.data.decode())
-    print(response.data.decode())
 
     # Register Connector Config
-    stix_worker_config = ConnectorRunConfigSchema(
+    stix_worker_config = ConfigCreate(
         connector_id=stix_worker["connector"]["id"], name="StixWorker Config", config={}
     )
-    response = test_client.post("/config/", json=stix_worker_config.json())
-    stix_config = json.loads(response.data.decode())
-    return stix_config["id"]
+    response = test_client.post("/config/", json=stix_worker_config.dict())
+    stix_config = Config(**json.loads(response.data.decode()))
+    return stix_config.id
 
 
 def create_connector_and_config_external_import(test_client) -> str:
@@ -49,52 +52,52 @@ def create_connector_and_config_external_import(test_client) -> str:
         ip: str
 
     # Register Connector
-    external_import = ConnectorIdentification(
+    external_import = ConnectorCreate(
         uuid=str(uuid.uuid4()),
         name="ExternalImport",
         type=ConnectorType.EXTERNAL_IMPORT.value,
         queue="stix_import",
     )
-    response = test_client.post("/connector/", json=external_import.json())
+    response = test_client.post("/connector/", json=external_import.dict())
     external_import = json.loads(response.data.decode())
 
     # Register Connector Config
-    external_import_config = ConnectorRunConfigSchema(
+    external_import_config = ConfigCreate(
         connector_id=external_import["connector"]["id"],
         name="EI Import 192.168.14.1",
         config=TestExternalImportRunConfig(ip="192.168.14.1"),
     )
-    response = test_client.post("/config/", json=external_import_config.json())
-    ei_config = json.loads(response.data.decode())
-    return ei_config["id"]
+    response = test_client.post("/config/", json=external_import_config.dict())
+    ei_config = Config(**json.loads(response.data.decode()))
+    return ei_config.id
 
 
 def create_triggered_workflow(configs: List, test_client) -> str:
     # Create Workflow
-    workflow = WorkflowSchema(
+    workflow = WorkflowCreate(
         name="Test Workflow Trigered",
         jobs=configs,
         execution_type=ExecutionTypeEnum.triggered,
         execution_args="",
         token="123441",
     )
-    response = test_client.post("/workflow/", json=workflow.json())
-    workflow_config = json.loads(response.data.decode())
-    return workflow_config["id"]
+    response = test_client.post("/workflow/", json=workflow.dict())
+    workflow_config = Workflow(**json.loads(response.data.decode()))
+    return workflow_config.id
 
 
 def create_scheduled_workflow(configs: List, test_client) -> str:
     # Create Workflow
-    workflow = WorkflowSchema(
+    workflow = WorkflowCreate(
         name="Test Workflow Scheduled",
         jobs=configs,
         execution_type=ExecutionTypeEnum.scheduled,
-        execution_args="",
+        execution_args="6",
         token="123441",
     )
-    response = test_client.post("/workflow/", json=workflow.json())
-    workflow_config = json.loads(response.data.decode())
-    return workflow_config["id"]
+    response = test_client.post("/workflow/", json=workflow.dict())
+    workflow_config = Workflow(**json.loads(response.data.decode()))
+    return workflow_config.id
 
 
 @pytest.fixture()
@@ -108,7 +111,7 @@ def clear_test_suite(test_client):
         pass
 
     # elastic.connection.indices.refresh(index=INDEX_NAME)
-    # elastic.connection. refresh(index=INDEX_NAME)
+    # elastic.connection.refresh(index=INDEX_NAME)
 
     yield
     s = Search(index=INDEX_NAME, using=elastic.connection).query("match_all")
@@ -126,12 +129,12 @@ def clear_test_suite(test_client):
 def update_status(
     test_client, config_id: str, run_id: str, status: State, result: Result = None
 ) -> int:
-    update_schema = RunUpdateSchema(
+    update_schema = RunUpdate(
         command="job_status",
         parameters={"config_id": config_id, "status": status, "result": result},
     )
-    response = test_client.put(f"/run/{run_id}", json=update_schema.json())
-    print(response.data.decode())
+    response = test_client.put(f"/run/{run_id}", json=update_schema.dict())
+    # print(response.data.decode())
     return response.status_code
 
 
@@ -148,14 +151,14 @@ def test_triggered_workflow(test_client, caplog, clear_test_suite):
     )
 
     # Setup Workflow Run
-    workflow_run = RunSchema(
+    workflow_run = RunCreate(
         workflow_id=workflow_id,
         work_id="",
         applicant_id="",
         arguments="{}",
     )
     response = test_client.post(
-        f"/workflow/{workflow_id}/run", json=workflow_run.json()
+        f"/workflow/{workflow_id}/run", json=workflow_run.dict()
     )
     assert response.status_code == 201
 
@@ -163,8 +166,8 @@ def test_triggered_workflow(test_client, caplog, clear_test_suite):
     run_id = None
     for record in caplog.records:
         if "Received RunContainer" in record.message:
-            run_container = json.loads(record.message.split("RunContainer: ")[1])
-            run_id = run_container["run_id"]
+            run_container = RunContainer(**json.loads(record.message.split("RunContainer: ")[1]))
+            run_id = run_container.run_id
 
     assert run_id is not None, "Could not find Run ID in log output"
 
@@ -192,10 +195,10 @@ def test_triggered_workflow(test_client, caplog, clear_test_suite):
 
     response = test_client.get(f"/run/{run_id}")
     assert response.status_code == 200
-    run = json.loads(response.data.decode())
+    run = Run(**json.loads(response.data.decode()))
 
-    assert run["status"] == State.finished.value
-    assert run["result"] == Result.success.value
+    assert run.status == State.finished.value
+    assert run.result == Result.success.value
 
 
 def test_scheduled_workflow(test_client, caplog, clear_test_suite):
@@ -211,14 +214,14 @@ def test_scheduled_workflow(test_client, caplog, clear_test_suite):
     )
 
     # Setup Workflow Run
-    workflow_run = RunSchema(
+    workflow_run = RunCreate(
         workflow_id=workflow_id,
         work_id="",
         applicant_id="",
         arguments="{}",
     )
     response = test_client.post(
-        f"/workflow/{workflow_id}/run", json=workflow_run.json()
+        f"/workflow/{workflow_id}/run", json=workflow_run.dict()
     )
     assert response.status_code == 201
 
@@ -226,8 +229,8 @@ def test_scheduled_workflow(test_client, caplog, clear_test_suite):
     run_id = None
     for record in caplog.records:
         if "Received RunContainer" in record.message:
-            run_container = json.loads(record.message.split("RunContainer: ")[1])
-            run_id = run_container["run_id"]
+            run_container = RunContainer(**json.loads(record.message.split("RunContainer: ")[1]))
+            run_id = run_container.run_id
 
     assert run_id is not None, "Could not find Run ID in log output"
 
@@ -255,7 +258,7 @@ def test_scheduled_workflow(test_client, caplog, clear_test_suite):
 
     response = test_client.get(f"/run/{run_id}")
     assert response.status_code == 200
-    run = json.loads(response.data.decode())
+    run = Run(**json.loads(response.data.decode()))
 
-    assert run["status"] == State.finished.value
-    assert run["result"] == Result.success.value
+    assert run.status == State.finished.value
+    assert run.result == Result.success.value

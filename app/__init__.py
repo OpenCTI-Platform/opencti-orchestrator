@@ -1,14 +1,11 @@
 import logging
-
-from flask import Flask
+from flask_openapi3 import Info, OpenAPI
 from pydantic.error_wrappers import ValidationError
 from apscheduler.schedulers import (
     SchedulerAlreadyRunningError,
     SchedulerNotRunningError,
 )
-
 from app.modules.config import FlaskSettings
-from flask import appcontext_tearing_down
 
 
 INDEX_NAME = "opencti_orchestrator"
@@ -21,7 +18,11 @@ elastic_logger.setLevel(logging.CRITICAL)
 
 
 def create_app(config_filename=None):
-    app = Flask(__name__, instance_relative_config=True)
+    # app = Flask(__name__, instance_relative_config=True)
+    info = Info(
+        title="OpenCTI Orchestrator", version="1.0.0"
+    )  # TODO get this version from setup.py
+    app = OpenAPI(__name__, info=info)
     try:
         app.config.from_object(FlaskSettings())
     except ValidationError as e:
@@ -65,13 +66,19 @@ def shutdown(sender, **extra):
 
 def register_blueprints(app):
     from app.blueprints.connector import connector_page
-    from app.blueprints.connector_config import connector_config_page
+    from app.blueprints.config import config_page
     from app.blueprints.workflow import workflow_page
     from app.blueprints.heartbeat import heartbeat_page
     from app.blueprints.run import run_page
 
-    app.register_blueprint(connector_page, url_prefix="/connector")
-    app.register_blueprint(connector_config_page, url_prefix="/config")
-    app.register_blueprint(workflow_page, url_prefix="/workflow")
-    app.register_blueprint(heartbeat_page, url_prefix="/heartbeat")
-    app.register_blueprint(run_page, url_prefix="/run")
+    # app.register_blueprint(connector_page, url_prefix="/connector")
+    # app.register_blueprint(connector_config_page, url_prefix="/config")
+    # app.register_blueprint(workflow_page, url_prefix="/workflow")
+    # app.register_blueprint(heartbeat_page, url_prefix="/heartbeat")
+    # app.register_blueprint(run_page, url_prefix="/run")
+
+    app.register_api(connector_page)
+    app.register_api(config_page)
+    app.register_api(workflow_page)
+    app.register_api(heartbeat_page)
+    app.register_api(run_page)

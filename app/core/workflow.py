@@ -1,16 +1,11 @@
-import json
-import logging
-
-import pika as pika
 from flask import has_app_context
-from app.extensions import elastic, scheduler
-from app.models import Workflow, Run, ConnectorRunConfig, Connector
+from app.core.models import Workflow, Run
 from flask import current_app
-from pycti.connector.v2.connectors.utils import State, Result, RunContainer, RunSchema
+from pycti.connector.v2.libs.orchestrator_schemas import State, Result, RunContainer, RunCreate
 from app.extensions import broker
 
 
-def launch_run_instance(run_schema: RunSchema, workflow: Workflow) -> Run:
+def launch_run_instance(run_schema: RunCreate, workflow: Workflow) -> Run:
     if has_app_context():
         context = current_app
     else:

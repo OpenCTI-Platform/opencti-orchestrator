@@ -2,7 +2,7 @@ from typing import Optional, List
 from app.core.brokers import pika_broker, std_broker
 from flask import _app_ctx_stack
 
-from app.resources.utils import BrokerClass
+from app.core.utils import BrokerClass
 
 brokers = {
     "RABBITMQ": pika_broker.PikaBroker,

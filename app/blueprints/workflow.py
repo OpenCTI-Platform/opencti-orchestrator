@@ -1,32 +1,24 @@
-import json
 import uuid
-from enum import Enum
-from typing import List, Optional
 
-from flask import Blueprint, request, current_app
-from pydantic.types import Json
-from stix2 import Bundle
-
-from pycti import ConnectorType
-from pydantic.main import BaseModel
-from pycti.connector.v2.connectors.utils import (
-    State,
-    Result,
-    RunContainer,
-    RunSchema,
-    ExecutionTypeEnum,
-    WorkflowSchema,
-)
-
-
-from app.core.workflow import launch_run_instance
-from app.extensions import elastic, scheduler
-from app.models import Workflow
 from elasticsearch_dsl.exceptions import ValidationException
+from flask_openapi3 import APIBlueprint, Tag
+from pycti.connector.v2.libs.orchestrator_schemas import (
+    RunCreate,
+    ExecutionTypeEnum,
+    WorkflowCreate,
+    Workflow as WorkflowSchema,
+)
+from pydantic import BaseModel, Field
+from flask import make_response, jsonify
+from app.core.workflow import launch_run_instance
+from app.extensions import scheduler
+from app.core.models import Workflow, ErrorMessage
 
-from app.resources.utils import get_json
+tag = Tag(name="workflow", description="Workflow Management")
 
-workflow_page = Blueprint("workflow", __name__)
+workflow_page = APIBlueprint(
+    "workflow", __name__, url_prefix="/workflow", abp_tags=[tag]
+)
 
 
 # class WorkflowSchema(BaseModel):
@@ -41,28 +33,47 @@ workflow_page = Blueprint("workflow", __name__)
 # }
 
 
-# @workflow_page.route('')
-# def get_all():
-#     workflows = {} # Workflow.query.all()
-#     # TODO implement
-#     return workflows, 200
-#
-#
+class WorkflowPath(BaseModel):
+    workflow_id: str = Field("workflow_id", description="ID of connector instance")
 
 
-@workflow_page.route("/<string:workflow_id>")
-def get(workflow_id: str):
-    workflow = Workflow.get(id=workflow_id)
+@workflow_page.get(
+    "/",
+    summary="Get all workflows",
+    description="Get all Workflows",
+    # responses={"201": HeartBeatResponse, "404": HeartBeatResponse},
+)
+def get_all():
+    workflows = {}  # Workflow.query.all()
+    # TODO implement
+    return make_response(jsonify(workflows), 200)
+
+
+@workflow_page.get(
+    "/<string:workflow_id>",
+    summary="Get existing Workflow",
+    description="Get workflow",
+    responses={"201": WorkflowSchema, "404": ErrorMessage},
+)
+def get(path: WorkflowPath):
+    workflow = Workflow.get(id=path.workflow_id)
     if not workflow:
-        return "", 404
+        response = make_response(jsonify(message="Not found"), 404)
     else:
-        return workflow.to_dict(include_meta=True), 200
+        response = make_response(jsonify(workflow.to_orm().dict()), 200)
+
+    return response
 
 
-@workflow_page.route("/", methods=["POST"])
-def post():
+@workflow_page.post(
+    "/",
+    summary="Add new Workflow",
+    description="Add new workflow",
+    responses={"201": WorkflowSchema, "404": ErrorMessage},
+)
+def post(body: WorkflowCreate):
     # json_data = request.get_json(force=True)
-    json_data = get_json(request)
+    # json_data = get_json(request)
     # mapper = {
     #     ConnectorType.EXTERNAL_IMPORT: Job,
     #     ConnectorType.INTERNAL_IMPORT_FILE: InternalImportJob,
@@ -73,34 +84,68 @@ def post():
     # }
     # TODO check execution type
 
-    workflow = Workflow(**json_data)
+    workflow = Workflow(**body.dict())
     try:
         workflow_meta = workflow.save(return_doc_meta=True)
     except ValidationException as e:
-        return str(e), 400
+        return make_response(jsonify(message=str(e)), 400)
 
-    return workflow.to_dict(include_meta=True), 201
+    return make_response(jsonify(workflow.to_orm().dict()), 201)
 
 
-@workflow_page.route("/<string:workflow_id>", methods=["DELETE"])
-def delete(workflow_id: str):
+@workflow_page.put(
+    "/<string:workflow_id>",
+    summary="Update Workflow",
+    description="Update existing workflow",
+    responses={"201": WorkflowSchema, "404": ErrorMessage}
+)
+def update(path: WorkflowPath, body: WorkflowSchema):
+    # json_data = request.get_json(force=True)
+    # json_data = get_json(request)
+    # mapper = {
+    #     ConnectorType.EXTERNAL_IMPORT: Job,
+    #     ConnectorType.INTERNAL_IMPORT_FILE: InternalImportJob,
+    #     ConnectorType.INTERNAL_ENRICHMENT: InternalEnrichmentJob,
+    #     ConnectorType.INTERNAL_EXPORT_FILE: InternalExportJob,
+    #     ConnectorType.STREAM: Job,
+    #     "STIX_IMPORTER": StixImportJob,
+    # }
+    # TODO check execution type
+
+    # workflow = Workflow(**body)
+    workflow = Workflow.get(id=path.workflow_id)
+    try:
+        workflow_meta = workflow.update(**body.dict())
+    except ValidationException as e:
+        return make_response(jsonify(message=str(e)), 400)
+
+    return make_response(jsonify(workflow.orm()), 201)
+
+
+@workflow_page.delete(
+    "/<string:workflow_id>",
+    summary="Delete workflow",
+    description="Delete existing workflow",
+    # responses={"201": "", "404": ErrorMessage},
+)
+def delete(path: WorkflowPath):
     pass
 
 
-@workflow_page.route("/<string:workflow_id>/run", methods=["POST"])
-def run(workflow_id: str):
-    json_data = get_json(request)
-    # TODO this is a stupid workaround
-    # json_data["parameters"] = str(json_data["parameters"])
-
-    run_schema = RunSchema(**json_data)
-    workflow = Workflow.get(id=workflow_id)
+@workflow_page.post(
+    "/<string:workflow_id>/run",
+    summary="Execute Run",
+    description="Initiate a Run based on Workflow ",
+    responses={"201": ErrorMessage, "400": ErrorMessage, "404": ErrorMessage}
+)
+def run(path: WorkflowPath, body: RunCreate):
+    workflow = Workflow.get(id=path.workflow_id)
     if workflow is None:
-        return "Workflow not found", 400
+        return make_response(jsonify(message="Not Found"), 404)
 
     # Create run instance
     if workflow.execution_type == ExecutionTypeEnum.triggered.value:
-        launch_run_instance(run_schema, workflow)
+        launch_run_instance(body, workflow)
     elif workflow.execution_type == ExecutionTypeEnum.scheduled.value:
         run_id = str(
             uuid.uuid4().hex
@@ -108,42 +153,15 @@ def run(workflow_id: str):
         scheduler.add_job(
             func=launch_run_instance,
             trigger="interval",
-            seconds=6,
-            args=[run_schema, workflow],
+            seconds=int(workflow.execution_args),
+            args=[body, workflow],
             id=run_id,
         )
     else:
-        return "Fail, unsupported execution type", 400
+        return make_response(jsonify(message="Fail, unsupported execution type"), 400)
 
-    return "Running", 201
+    return make_response(jsonify(message="Running"), 201)
 
-
-# @workflow_page.route("/run/<int:workflow_id>", methods=["GET"])
-# def run(workflow_id):
-#     #     _send_message(connector_instance.connector.queue)
-#     pass
-
-# config_id = json_data["config_id"]
-# config = ConnectorRunConfig.get(id=config_id, using=elastic)
-# connector = Connector.get(id=config.connector_id, using=elastic)
-# step = mapper.get(connector.type)
-# workflow = Workflow(
-#     name="My workflow?",
-#     applicant_id="???",  # where do I get it from?
-#     worksteps=[
-#         step(config_id=json_data["config_id"], **json_data),
-#         StixImportJob(),
-#     ],
-# )
-#
-# if current_app.config["BROKER"] == "STDOUT":
-#     broker = _send_stdout_message
-# elif current_app.config["BROKER"] == "PIKA":
-#     broker = _send_pika_message
-# else:
-#     return "unknown broker", 400
-#
-# broker(workflow)
 
 # result = Connector. \
 #     search(using=elastic.connection). \

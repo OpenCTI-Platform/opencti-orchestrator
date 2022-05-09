@@ -1,20 +1,31 @@
 # from app.schemas import connector_schema, connectors_schema
-import json
 from datetime import datetime
 
 from elasticsearch_dsl import Q
 from elasticsearch_dsl.exceptions import ValidationException
-from flask import Blueprint, request, current_app
+from flask import current_app, make_response, jsonify
+from flask_openapi3 import APIBlueprint, Tag
+from pycti.connector.v2.libs.orchestrator_schemas import ConnectorCreate, Connector as ConnectorSchema
+from pydantic import BaseModel, Field
 
-from app.extensions import elastic
-from app.models import Connector, ConnectorInstance
-from pycti.connector.v2.connectors.utils import ConnectorIdentification
-from app.resources.utils import get_json
+from app.core.models import Connector, ConnectorInstance, ErrorMessage
 
-connector_page = Blueprint("connector", __name__)
+tag = Tag(name="connector", description="Connector Management")
+connector_page = APIBlueprint(
+    "connector", __name__, url_prefix="/connector", abp_tags=[tag]
+)
 
 
-@connector_page.route("")
+class ConnectorPath(BaseModel):
+    connector_id: str = Field("connector_id", description="ID of connector instance")
+
+
+@connector_page.get(
+    "",
+    summary="Get all Connectors",
+    description="Get all existing connectors",
+    responses={"201": ConnectorSchema, "404": ErrorMessage},
+)
 def get_all():
     connectors = {}  # Connector.query.all()
     # TODO implement
@@ -22,20 +33,28 @@ def get_all():
     return connectors, 200
 
 
-@connector_page.route("/<string:connector_id>")
-def get(connector_id: str):
-    connector = Connector.get(id=connector_id)
+@connector_page.get(
+    "/<string:connector_id>",
+    summary="Get Connector",
+    description="Get existing Connector",
+    responses={"201": ConnectorSchema, "404": ErrorMessage},
+)
+def get(path: ConnectorPath):
+    connector = Connector.get(id=path.connector_id)
     if not connector:
-        return "", 404
+        return make_response(jsonify(message="Not Found"), 404)
     else:
-        return connector.to_dict(), 200
+        return make_response(jsonify(connector.to_orm()), 200)
 
 
-@connector_page.route("/", methods=["POST"])
-def post():
-    json_data = get_json(request)
-
-    connector = Connector(**json_data)
+@connector_page.post(
+    "/",
+    summary="Add new Connector",
+    description="Add new Connector",
+    # responses={"201": ConnectorSchema, "404": ErrorMessage}, # 201 schema is wrong
+)
+def post(body: ConnectorCreate):
+    connector = Connector(**body.dict())
 
     single_result = (
         Connector.search()
@@ -59,7 +78,9 @@ def post():
     )
     if len(single_result) > 0:
         result = [f"Connector({i.uuid}, {i.name}, {i.queue})" for i in single_result]
-        return f"{{Chosen fields are not unique: {result} }}", 400
+        return make_response(
+            jsonify(f"{{Chosen fields are not unique: {result} }}"), 400
+        )
 
     result = (
         Connector.search()
@@ -75,10 +96,13 @@ def post():
     )
     if len(result) > 1:
         summary = [f"Connector({i.uuid}, {i.name}, {i.queue})" for i in result]
-        return (
-            f"More than 1 connector registered, please delete one of those ids {summary}",
+        return make_response(
+            jsonify(
+                f"More than 1 connector registered, please delete one of those ids {summary}"
+            ),
             400,
         )
+
     elif len(result) == 1:
         # Using existing connector, only create new instance
         connector_id = result[0].meta["id"]
@@ -89,7 +113,7 @@ def post():
             connector_info_meta = connector.save(return_doc_meta=True)
             connector_id = connector_info_meta["_id"]
         except ValidationException as e:
-            return str(e), 400
+            return make_response(jsonify(str(e)), 400)
 
     connector_instance = ConnectorInstance(
         last_seen=datetime.now(), connector_id=connector_id
@@ -106,33 +130,21 @@ def post():
             }
         },
         "connector_instance": connector_instance_meta["_id"],
-        "connector": connector.to_dict(include_meta=True),
+        "connector": connector.to_orm().dict(),
     }
-    return config, 201
+    return make_response(jsonify(config), 201)
 
 
-@connector_page.route("/<string:connector_id>", methods=["DELETE"])
-def delete(connector_id: str):
-    connector = Connector.get(id=connector_id)
+@connector_page.delete(
+    "/<string:connector_id>",
+    summary="Delete Connector",
+    description="Delete connector",
+    # responses={"201": "", "404": ErrorMessage},
+)
+def delete(path: ConnectorPath):
+    connector = Connector.get(id=path.connector_id)
     if not connector:
-        return "", 404
+        return make_response(jsonify(message="Not Found"), 404)
 
     connector.delete()
-    return "", 204
-
-
-# @connector_page.route('/schedule/', methods=['POST'])
-# def schedule():
-#     connector_id = request.json['connector']
-#
-#     scheduler.add_job(func=dummy_func,
-#                       trigger="interval",
-#                       seconds=1,
-#                       id="test job 2",
-#                       name="test job 2",
-#                       replace_existing=True, )
-#     return "scheduled", 200
-#
-# def dummy_func():
-#     dat: str = str(datetime.now())
-#     print(f"executing scheduled {dat}")
+    return make_response(jsonify(), 204)

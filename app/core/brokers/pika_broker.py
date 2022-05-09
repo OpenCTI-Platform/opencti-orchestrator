@@ -1,13 +1,11 @@
 import pika as pika
 
-from app.resources.utils import BrokerClass
-from pycti.connector.v2.connectors.utils import RunContainer
+from pycti.connector.v2.libs.orchestrator_schemas import RunContainer
+from app.core.utils import BrokerClass
 
 
 class PikaBroker(BrokerClass):
     def send_message(self, run_container: RunContainer):
-        # import here to avoid circular import
-        from app.models import ConnectorRunConfig, Connector
 
         with self.app.app_context():
             # TODO

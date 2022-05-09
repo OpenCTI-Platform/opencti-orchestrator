@@ -2,9 +2,9 @@ from app import create_app, INDEX_NAME
 from app.extensions import elastic
 from flask.cli import FlaskGroup
 
-from app.models import (
+from app.core.models import (
     Connector,
-    ConnectorRunConfig,
+    RunConfig,
     ConnectorInstance,
     Run,
     Workflow,
@@ -21,7 +21,7 @@ def recreate_db():
 
     Connector.init(using=elastic.connection)
     ConnectorInstance.init(using=elastic.connection)
-    ConnectorRunConfig.init(using=elastic.connection)
+    RunConfig.init(using=elastic.connection)
     Workflow.init(using=elastic.connection)
     Run.init(using=elastic.connection)
 
