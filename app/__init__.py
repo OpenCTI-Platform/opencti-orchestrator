@@ -71,12 +71,6 @@ def register_blueprints(app):
     from app.blueprints.heartbeat import heartbeat_page
     from app.blueprints.run import run_page
 
-    # app.register_blueprint(connector_page, url_prefix="/connector")
-    # app.register_blueprint(connector_config_page, url_prefix="/config")
-    # app.register_blueprint(workflow_page, url_prefix="/workflow")
-    # app.register_blueprint(heartbeat_page, url_prefix="/heartbeat")
-    # app.register_blueprint(run_page, url_prefix="/run")
-
     app.register_api(connector_page)
     app.register_api(config_page)
     app.register_api(workflow_page)
