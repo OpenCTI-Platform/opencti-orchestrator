@@ -30,7 +30,7 @@ class FlaskSettings(BaseSettings):
         "max_instances": 3
     }
     REDIS_HOST: str
-    REDIS_PORT: int
+    REDIS_PORT: int = 6379
 
     @root_validator
     def pre_convert_redis_to_scheduler_settings(cls, values: dict):
