@@ -127,6 +127,7 @@ def post(body: ConnectorCreate):
                 "user": current_app.config["RABBITMQ_USER"],
                 "password": current_app.config["RABBITMQ_PASSWORD"],
                 "host": current_app.config["RABBITMQ_HOST"],
+                "port": current_app.config["RABBITMQ_PORT"],
             }
         },
         "connector_instance": connector_instance_meta["_id"],
