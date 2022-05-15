@@ -1,0 +1,6 @@
+ELASTICSEARCH_HOST: "changeme"
+BROKER: "stdout"
+RABBITMQ_HOST: "changeme"
+RABBITMQ_USER: "changeme"
+RABBITMQ_PASSWORD: "changeme"
+REDIS_HOST: "changeme"

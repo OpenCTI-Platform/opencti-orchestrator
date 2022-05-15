@@ -1,19 +1,60 @@
-import json
 from pathlib import Path
 from typing import List, Any, Dict
-
+from apscheduler.jobstores.redis import RedisJobStore
 import yaml
-from pydantic import BaseSettings
+from pydantic import BaseSettings, root_validator
 
 
 class FlaskSettings(BaseSettings):
+    # DB Settings
     ELASTICSEARCH_HOST: str | List[str]
     ELASTICSEARCH_HTTP_AUTH: str = None
-    SCHEDULER_API_ENABLED: bool = False
+    # Broker Settings
     BROKER: str = "RabbitMQ"
     RABBITMQ_HOST: str
+    RABBITMQ_PORT: int = 5672
     RABBITMQ_USER: str
     RABBITMQ_PASSWORD: str
+    # Scheduler Settings
+    SCHEDULER_API_ENABLED: bool = False
+    SCHEDULER_JOBSTORES: dict = {
+        "apscheduler.jobstores.default": {}
+    }
+    SCHEDULER_EXECUTORS: dict = {
+        "default": {
+            "type": "threadpool", "max_workers": 20
+        }
+    }
+    SCHEDULER_JOB_DEFAULTS: dict = {
+        "coalesce": False,
+        "max_instances": 3
+    }
+    REDIS_HOST: str
+    REDIS_PORT: int
+
+    @root_validator
+    def pre_convert_redis_to_scheduler_settings(cls, values: dict):
+        host = values.get('REDIS_HOST')
+        port = values.get('REDIS_PORT')
+        if not host or not port:
+            raise ValueError("Missing Redis host and port settings")
+
+        values['SCHEDULER_JOBSTORES'] = {
+            "apscheduler.jobstores.default": {
+                "type": "redis",
+                "jobs_key": "orchestrator_jobs",
+                "run_times_key": "orchestrator_runs",
+                "host": host,
+                "port": port
+            }
+        }
+        return values
+
+
+    # @validator("regex_patterns", "filter_config", pre=True)
+    # def pre_convert_redis_to_scheduler_seetings(cls, field: str) -> Any:
+    #     return list(filter(None, (x.strip() for x in field.splitlines())))
+
 
     class Config:
         @classmethod
