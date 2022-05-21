@@ -13,6 +13,7 @@ INDEX_NAME = "opencti_orchestrator"
 logging.basicConfig(level=logging.INFO)
 
 # TODO enable elasticsearch logging again when logging is set to DEBUG
+# TODO add verification that the index exists
 elastic_logger = logging.getLogger("elasticsearch")
 elastic_logger.setLevel(logging.CRITICAL)
 

@@ -15,6 +15,7 @@ from pycti.connector.v2.libs.orchestrator_schemas import (
 from pydantic import BaseModel
 
 from app import INDEX_NAME
+from app.core.crud import validate_model
 from app.extensions import elastic
 from app.modules.elasticsearch import ChoicesKeyword
 
@@ -66,9 +67,17 @@ class Connector(BaseDocument):
     type = ChoicesKeyword(
         required=True, choices=[e.value for e in ConnectorType] + ["STIX_IMPORT"]
     )
+    config_schema = Object(enabled=False)
 
     def to_orm(self):
         return ConnectorSchema(**self.to_dict(include_meta=True))
+
+    def save(self, **kwargs):
+        print(f"{self.name} - {self.config_schema} ({type(self.config_schema)})")
+        if self.config_schema and not validate_model(self.config_schema.to_dict()):
+            raise ValueError("Invalid model transferred")
+
+        return super(Connector, self).save(**kwargs)
 
 
 class ConnectorInstance(BaseDocument):
@@ -88,6 +97,16 @@ class RunConfig(BaseDocument):
 
     def to_orm(self):
         return ConfigSchema(**self.to_dict(include_meta=True))
+
+    def save(self, **kwargs):
+        connector = Connector.get(id=self.connector_id)
+        config_schema = connector.config_schema
+        print(f"{self.name} - {self.config} ({type(self.config)})")
+
+        if config_schema and not validate_model(json.dumps(config_schema.to_dict()), self.config.to_dict()):
+            raise ValueError("Invalid model transferred")
+
+        return super(RunConfig, self).save(**kwargs)
 
 
 class JobStatus(InnerDoc):

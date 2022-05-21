@@ -56,6 +56,7 @@ def get(path: ConnectorPath):
 def post(body: ConnectorCreate):
     connector = Connector(**body.dict())
 
+    # TODO use facetted search
     single_result = (
         Connector.search()
         .query(

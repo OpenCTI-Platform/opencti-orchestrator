@@ -30,19 +30,27 @@ from app.extensions import elastic
 def create_connector_and_config_stix(test_client) -> str:
     # Register Connector
     stix_worker = ConnectorCreate(
-        uuid=str(uuid.uuid4()),
+        uuid="7af04c62-5783-497b-a49b-baba88b8802d",
         name="StixWorker",
         type="STIX_IMPORT",
         queue="stix_import",
+        config_schema=None
     )
     response = test_client.post("/connector/", json=stix_worker.dict())
     stix_worker = json.loads(response.data.decode())
+    print(stix_worker)
+    assert response.status_code == 201, f"Error {response.data.decode()}"
+
+    stix_worker_connector = Connector(**stix_worker["connector"])
 
     # Register Connector Config
     stix_worker_config = ConfigCreate(
-        connector_id=stix_worker["connector"]["id"], name="StixWorker Config", config={}
+        connector_id=stix_worker_connector.id,
+        name="StixWorker Config",
+        config={}
     )
     response = test_client.post("/config/", json=stix_worker_config.dict())
+    assert response.status_code == 201, f"Error {response.data.decode()}"
     stix_config = Config(**json.loads(response.data.decode()))
     return stix_config.id
 
@@ -53,21 +61,28 @@ def create_connector_and_config_external_import(test_client) -> str:
 
     # Register Connector
     external_import = ConnectorCreate(
-        uuid=str(uuid.uuid4()),
+        uuid="61464bca-a9d6-47e4-a674-d50eb5df1354",
         name="ExternalImport",
         type=ConnectorType.EXTERNAL_IMPORT.value,
-        queue="stix_import",
+        queue="external_import",
+        config_schema=TestExternalImportRunConfig.schema_json()
     )
     response = test_client.post("/connector/", json=external_import.dict())
     external_import = json.loads(response.data.decode())
+    print(external_import)
+    assert response.status_code == 201, f"Error {response.data.decode()}"
+    external_import_connector = Connector(**external_import["connector"])
 
     # Register Connector Config
     external_import_config = ConfigCreate(
-        connector_id=external_import["connector"]["id"],
-        name="EI Import 192.168.14.1",
+        connector_id=external_import_connector.id,
+        name="EI Import",
         config=TestExternalImportRunConfig(ip="192.168.14.1"),
     )
+    a = external_import_config.dict()
+    print(f"sending config {a}")
     response = test_client.post("/config/", json=external_import_config.dict())
+    assert response.status_code == 201, f"Error {response.data.decode()}"
     ei_config = Config(**json.loads(response.data.decode()))
     return ei_config.id
 
@@ -82,6 +97,7 @@ def create_triggered_workflow(configs: List, test_client) -> str:
         token="123441",
     )
     response = test_client.post("/workflow/", json=workflow.dict())
+    assert response.status_code == 201, f"Error {response.data.decode()}"
     workflow_config = Workflow(**json.loads(response.data.decode()))
     return workflow_config.id
 
@@ -96,6 +112,7 @@ def create_scheduled_workflow(configs: List, test_client) -> str:
         token="123441",
     )
     response = test_client.post("/workflow/", json=workflow.dict())
+    assert response.status_code == 201, f"Error {response.data.decode()}"
     workflow_config = Workflow(**json.loads(response.data.decode()))
     return workflow_config.id
 
@@ -144,8 +161,9 @@ def test_triggered_workflow(test_client, caplog, clear_test_suite):
     WHEN the '/login' page is requested (GET)
     THEN check the response is valid
     """
-    stix_config_id = create_connector_and_config_stix(test_client)
     external_import_config_id = create_connector_and_config_external_import(test_client)
+    stix_config_id = create_connector_and_config_stix(test_client)
+
     workflow_id = create_triggered_workflow(
         [stix_config_id, external_import_config_id], test_client
     )
@@ -160,7 +178,7 @@ def test_triggered_workflow(test_client, caplog, clear_test_suite):
     response = test_client.post(
         f"/workflow/{workflow_id}/run", json=workflow_run.dict()
     )
-    assert response.status_code == 201
+    assert response.status_code == 201, f"Error {response.data.decode()}"
 
     time.sleep(1)
     run_id = None
@@ -223,7 +241,7 @@ def test_scheduled_workflow(test_client, caplog, clear_test_suite):
     response = test_client.post(
         f"/workflow/{workflow_id}/run", json=workflow_run.dict()
     )
-    assert response.status_code == 201
+    assert response.status_code == 201, f"Error {response.data.decode()}"
 
     time.sleep(8)
     run_id = None
