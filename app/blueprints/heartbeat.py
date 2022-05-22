@@ -32,7 +32,6 @@ def get(path: HeartBeatPath):
     if not instance:
         return make_response(jsonify(message="Not Found"), 404)
     else:
-        print(f"time: {instance.last_seen}")
         return make_response(jsonify(instance.to_orm().dict()), 200)
 
 
