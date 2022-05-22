@@ -20,16 +20,9 @@ def heartbeat_service(interval: int):
                 .query("exists", field="last_seen")
                 .execute()
             ):
-                print(f"Instance connector '{instance.connector_id}' instance '{instance.meta.id}'")
                 if instance.last_seen > (time.time() - interval):
-                    print(f"Setting to available")
                     instance.status = "available"
                 else:
-                    print(f"Setting to unavailable")
                     instance.status = "unavailable"
 
                 instance.save()
-
-    # TODO implement heartbeat service
-    # check every run when each connector last contacted the scheduler
-    # and disable connectors which haven't been responding in X time
