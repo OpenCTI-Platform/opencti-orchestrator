@@ -5,6 +5,7 @@ from apscheduler.schedulers import (
     SchedulerAlreadyRunningError,
     SchedulerNotRunningError,
 )
+
 from app.modules.config import FlaskSettings
 
 
@@ -34,6 +35,8 @@ def create_app(config_filename=None):
     initialize_extensions(app)
     register_blueprints(app)
     # appcontext_tearing_down.connect(shutdown)
+    # TODO start heartbeat service
+    setup_heartbeat()
 
     return app
 
@@ -77,3 +80,16 @@ def register_blueprints(app):
     app.register_api(workflow_page)
     app.register_api(heartbeat_page)
     app.register_api(run_page)
+
+
+def setup_heartbeat():
+    from app.core.heartbeat_service import heartbeat_service
+    from app.extensions import scheduler
+
+    scheduler.add_job(
+        func=heartbeat_service,
+        trigger="interval",
+        seconds=scheduler.app.config["HEARTBEAT_INTERVAL"] / 2,
+        args=[scheduler.app.config["HEARTBEAT_INTERVAL"]],
+        id="heartbeat_service",
+    )

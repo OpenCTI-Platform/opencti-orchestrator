@@ -9,6 +9,8 @@ class FlaskSettings(BaseSettings):
     # DB Settings
     ELASTICSEARCH_HOST: str | List[str]
     ELASTICSEARCH_HTTP_AUTH: str = None
+    # Heartbeat
+    HEARTBEAT_INTERVAL: int = 10  # interval in seconds
     # Broker Settings
     BROKER: str = "RabbitMQ"
     RABBITMQ_HOST: str
@@ -17,44 +19,29 @@ class FlaskSettings(BaseSettings):
     RABBITMQ_PASSWORD: str
     # Scheduler Settings
     SCHEDULER_API_ENABLED: bool = False
-    SCHEDULER_JOBSTORES: dict = {
-        "apscheduler.jobstores.default": {}
-    }
-    SCHEDULER_EXECUTORS: dict = {
-        "default": {
-            "type": "threadpool", "max_workers": 20
-        }
-    }
-    SCHEDULER_JOB_DEFAULTS: dict = {
-        "coalesce": False,
-        "max_instances": 3
-    }
+    SCHEDULER_JOBSTORES: dict = {"apscheduler.jobstores.default": {}}
+    SCHEDULER_EXECUTORS: dict = {"default": {"type": "threadpool", "max_workers": 20}}
+    SCHEDULER_JOB_DEFAULTS: dict = {"coalesce": False, "max_instances": 3}
     REDIS_HOST: str
     REDIS_PORT: int = 6379
 
     @root_validator
     def pre_convert_redis_to_scheduler_settings(cls, values: dict):
-        host = values.get('REDIS_HOST')
-        port = values.get('REDIS_PORT')
+        host = values.get("REDIS_HOST")
+        port = values.get("REDIS_PORT")
         if not host or not port:
             raise ValueError("Missing Redis host and port settings")
 
-        values['SCHEDULER_JOBSTORES'] = {
+        values["SCHEDULER_JOBSTORES"] = {
             "apscheduler.jobstores.default": {
                 "type": "redis",
                 "jobs_key": "orchestrator_jobs",
                 "run_times_key": "orchestrator_runs",
                 "host": host,
-                "port": port
+                "port": port,
             }
         }
         return values
-
-
-    # @validator("regex_patterns", "filter_config", pre=True)
-    # def pre_convert_redis_to_scheduler_seetings(cls, field: str) -> Any:
-    #     return list(filter(None, (x.strip() for x in field.splitlines())))
-
 
     class Config:
         @classmethod

@@ -1,7 +1,12 @@
 from flask import has_app_context
 from app.core.models import Workflow, Run
 from flask import current_app
-from pycti.connector.v2.libs.orchestrator_schemas import State, Result, RunContainer, RunCreate
+from pycti.connector.v2.libs.orchestrator_schemas import (
+    State,
+    Result,
+    RunContainer,
+    RunCreate,
+)
 from app.extensions import broker
 
 

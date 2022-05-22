@@ -4,7 +4,7 @@ from pycti.connector.v2.libs.orchestrator_schemas import (
     Result,
     RunUpdate,
     Run as RunSchema,
-    RunCreate
+    RunCreate,
 )
 from flask import jsonify, make_response
 from pydantic import BaseModel, Field

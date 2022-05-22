@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 from flask import make_response, jsonify
 from flask_openapi3 import APIBlueprint, Tag
@@ -21,6 +22,20 @@ class HeartBeatResponse(BaseModel):
     message: str = Field("ok", description="Exception Information")
 
 
+@heartbeat_page.get(
+    "/<string:instance_id>",
+    summary="Get instance info",
+    # responses={"200": }
+)
+def get(path: HeartBeatPath):
+    instance = ConnectorInstance.get(id=path.instance_id)
+    if not instance:
+        return make_response(jsonify(message="Not Found"), 404)
+    else:
+        print(f"time: {instance.last_seen}")
+        return make_response(jsonify(instance.to_orm().dict()), 200)
+
+
 @heartbeat_page.put(
     "/<string:instance_id>",
     summary="Update heartbeat for connector instance",
@@ -31,7 +46,7 @@ def update(path: HeartBeatPath):
     instance = ConnectorInstance.get(id=path.instance_id)
     if not instance:
         return make_response(jsonify(message="Not Found"), 404)
-    instance.update(last_seen=datetime.now())
+    instance.update(last_seen=int(time.time()), status="available")
     return make_response(jsonify(message="OK"), 201)
 
 

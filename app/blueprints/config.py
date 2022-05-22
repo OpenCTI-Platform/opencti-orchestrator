@@ -1,6 +1,9 @@
 from elasticsearch_dsl.exceptions import ValidationException
 from flask_openapi3 import APIBlueprint, Tag
-from pycti.connector.v2.libs.orchestrator_schemas import Config as ConfigSchema, ConfigCreate
+from pycti.connector.v2.libs.orchestrator_schemas import (
+    Config as ConfigSchema,
+    ConfigCreate,
+)
 from pydantic import BaseModel, Field
 from flask import make_response, jsonify
 from app.core.models import RunConfig, ErrorMessage

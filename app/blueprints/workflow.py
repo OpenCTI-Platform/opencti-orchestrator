@@ -97,7 +97,7 @@ def post(body: WorkflowCreate):
     "/<string:workflow_id>",
     summary="Update Workflow",
     description="Update existing workflow",
-    responses={"201": WorkflowSchema, "404": ErrorMessage}
+    responses={"201": WorkflowSchema, "404": ErrorMessage},
 )
 def update(path: WorkflowPath, body: WorkflowSchema):
     # json_data = request.get_json(force=True)
@@ -136,12 +136,14 @@ def delete(path: WorkflowPath):
     "/<string:workflow_id>/run",
     summary="Execute Run",
     description="Initiate a Run based on Workflow ",
-    responses={"201": ErrorMessage, "400": ErrorMessage, "404": ErrorMessage}
+    responses={"201": ErrorMessage, "400": ErrorMessage, "404": ErrorMessage},
 )
 def run(path: WorkflowPath, body: RunCreate):
     workflow = Workflow.get(id=path.workflow_id)
     if workflow is None:
         return make_response(jsonify(message="Not Found"), 404)
+
+    # TODO check if all connector have instances which are alive
 
     # Create run instance
     if workflow.execution_type == ExecutionTypeEnum.triggered.value:

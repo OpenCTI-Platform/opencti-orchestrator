@@ -1,11 +1,15 @@
 # from app.schemas import connector_schema, connectors_schema
+import time
 from datetime import datetime
 
 from elasticsearch_dsl import Q
 from elasticsearch_dsl.exceptions import ValidationException
 from flask import current_app, make_response, jsonify
 from flask_openapi3 import APIBlueprint, Tag
-from pycti.connector.v2.libs.orchestrator_schemas import ConnectorCreate, Connector as ConnectorSchema
+from pycti.connector.v2.libs.orchestrator_schemas import (
+    ConnectorCreate,
+    Connector as ConnectorSchema,
+)
 from pydantic import BaseModel, Field
 
 from app.core.models import Connector, ConnectorInstance, ErrorMessage
@@ -44,7 +48,7 @@ def get(path: ConnectorPath):
     if not connector:
         return make_response(jsonify(message="Not Found"), 404)
     else:
-        return make_response(jsonify(connector.to_orm()), 200)
+        return make_response(jsonify(connector.to_orm().dict()), 200)
 
 
 @connector_page.post(
@@ -117,7 +121,7 @@ def post(body: ConnectorCreate):
             return make_response(jsonify(str(e)), 400)
 
     connector_instance = ConnectorInstance(
-        last_seen=datetime.now(), connector_id=connector_id
+        last_seen=int(time.time()), connector_id=connector_id, status="available"
     )
     connector_instance_meta = connector_instance.save(return_doc_meta=True)
 
@@ -129,7 +133,10 @@ def post(body: ConnectorCreate):
                 "password": current_app.config["RABBITMQ_PASSWORD"],
                 "host": current_app.config["RABBITMQ_HOST"],
                 "port": current_app.config["RABBITMQ_PORT"],
-            }
+            },
+            "heartbeat": {
+                "interval": current_app.config["HEARTBEAT_INTERVAL"],
+            },
         },
         "connector_instance": connector_instance_meta["_id"],
         "connector": connector.to_orm().dict(),

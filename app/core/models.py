@@ -1,6 +1,6 @@
 import json
 
-from elasticsearch_dsl import Document, Date, Keyword, Object, InnerDoc, Nested
+from elasticsearch_dsl import Document, Date, Keyword, Object, InnerDoc, Nested, Integer
 from pycti import ConnectorType
 from pycti.connector.v2.libs.orchestrator_schemas import (
     State,
@@ -11,6 +11,7 @@ from pycti.connector.v2.libs.orchestrator_schemas import (
     Config as ConfigSchema,
     Workflow as WorkflowSchema,
     Run as RunSchema,
+    Instance as InstanceSchema,
 )
 from pydantic import BaseModel
 
@@ -81,9 +82,12 @@ class Connector(BaseDocument):
 
 
 class ConnectorInstance(BaseDocument):
-    last_seen = Date(required=True)
-    # status = db.Column(db.Enum?, nullable=False)
+    last_seen = Integer(required=True)
+    status = Keyword(required=True)
     connector_id = Keyword(required=True)
+
+    def to_orm(self):
+        return InstanceSchema(**self.to_dict(include_meta=True))
 
 
 connectorRunConfigUniqueSchema = ["name"]
@@ -101,9 +105,11 @@ class RunConfig(BaseDocument):
     def save(self, **kwargs):
         connector = Connector.get(id=self.connector_id)
         config_schema = connector.config_schema
-        print(f"{self.name} - {self.config} ({type(self.config)})")
 
-        if config_schema and not validate_model(json.dumps(config_schema.to_dict()), self.config.to_dict()):
+        if config_schema and not validate_model(
+            json.dumps(config_schema.to_dict()), self.config.to_dict()
+        ):
+            # TODO add missing/wrong fields to message
             raise ValueError("Invalid model transferred")
 
         return super(RunConfig, self).save(**kwargs)

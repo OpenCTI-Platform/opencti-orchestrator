@@ -58,10 +58,10 @@ from pydantic.main import BaseModel
 
 def validate_model(model_schema: dict | str, config: dict = None) -> bool | str:
     if isinstance(model_schema, dict):
-        title = model_schema.get('title')
+        title = model_schema.get("title")
         schema = json.dumps(model_schema)
     elif isinstance(model_schema, str):
-        title = json.loads(model_schema).get('title')
+        title = json.loads(model_schema).get("title")
         schema = model_schema
     # elif isinstance(model_schema, InnerDocument)
     else:
@@ -70,7 +70,7 @@ def validate_model(model_schema: dict | str, config: dict = None) -> bool | str:
     original_path = os.getcwd()
     with TemporaryDirectory() as temporary_directory_name:
         temporary_directory = Path(temporary_directory_name)
-        output = Path(temporary_directory / f'{title}.py')
+        output = Path(temporary_directory / f"{title}.py")
 
         generate(
             schema,
@@ -79,7 +79,7 @@ def validate_model(model_schema: dict | str, config: dict = None) -> bool | str:
             output=output,
         )
         os.chdir(output.parent)
-        sys.path.insert(0, '')
+        sys.path.insert(0, "")
         _tmp = importlib.import_module(f"{title}")
         model: BaseModel = getattr(_tmp, title)
 
