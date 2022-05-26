@@ -9,7 +9,7 @@ from app.extensions import scheduler
 THRESHOLD = 10
 
 
-def hteartbeat_service(interval: int):
+def heartbeat_service(interval: int):
     with scheduler.app.app_context():
         for connector in Connector.search().query().execute():
             for instance in (
