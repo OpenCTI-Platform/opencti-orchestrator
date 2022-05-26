@@ -146,7 +146,7 @@ def run(path: WorkflowPath, body: RunCreate):
     try:
         verify_running_connectors(workflow)
     except ValueError as e:
-        return make_response(jsonify(message=e), 400)
+        return make_response(jsonify(message=str(e)), 400)
 
     # Create run instance
     if workflow.execution_type == ExecutionTypeEnum.triggered.value:
