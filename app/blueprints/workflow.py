@@ -9,10 +9,10 @@ from pycti.connector.v2.libs.orchestrator_schemas import (
     Workflow as WorkflowSchema,
 )
 from pydantic import BaseModel, Field
-from flask import make_response, jsonify
-from app.core.workflow import launch_run_instance
+from flask import make_response, jsonify, current_app
+from app.core.workflow import launch_run_instance, verify_running_connectors
 from app.extensions import scheduler
-from app.core.models import Workflow, ErrorMessage
+from app.core.models import Workflow, ErrorMessage, RunConfig, ConnectorInstance
 
 tag = Tag(name="workflow", description="Workflow Management")
 
@@ -143,7 +143,10 @@ def run(path: WorkflowPath, body: RunCreate):
     if workflow is None:
         return make_response(jsonify(message="Not Found"), 404)
 
-    # TODO check if all connector have instances which are alive
+    try:
+        verify_running_connectors(workflow)
+    except ValueError as e:
+        return make_response(jsonify(message=e), 400)
 
     # Create run instance
     if workflow.execution_type == ExecutionTypeEnum.triggered.value:
@@ -163,80 +166,3 @@ def run(path: WorkflowPath, body: RunCreate):
         return make_response(jsonify(message="Fail, unsupported execution type"), 400)
 
     return make_response(jsonify(message="Running"), 201)
-
-
-# result = Connector. \
-#     search(using=elastic.connection). \
-#     filter('term', uuid=json_data['uuid']). \
-#     execute()
-# TODO check if name is unique and if connector_id exists
-# if len(result) > 0:
-#     return f"{{'uuid': 'value \"{json_data['uuid']}\" already exists}}", 400
-
-# try:
-#     workflow_meta = workflow.save(using=elastic.connection, return_doc_meta=True)
-# except ValidationException as e:
-#     return str(e), 400
-
-
-# @workflow_page.route('/', methods=['POST'])
-# def new_workflow():
-#     # Parse
-#     # {
-#     #   1: [
-#     #           {connector_id: <id>, arguments: []},
-#     #           {connector_id: <id>, arguments: []},
-#     #   2: []}
-#
-#     workflow = Workflow(
-#         name=request.json['name'],
-#         connector_id=request.json['connector_id']
-#         )
-#     db.session.add(workflow)
-#     db.session.commit()
-#     return workflow_schema.dump(workflow), 201
-#
-# @workflow_page.route('/run/<int:id>')
-# def run(id):
-#     workflow = Workflow.query.get_or_404(id)
-#     print(Workflow.query.all())
-#     print(Connector.query.with_parent(workflow).all())
-#     query = Workflow.query.options(joinedload('connector'))
-#     for category in query:
-#         print(category)
-#     print(workflow)# TODO run send message to rabbitmq
-#     return workflow_schema.dump(workflow)
-#
-# def prepare_message(id):
-#     result = {}
-#     workflow = Workflow.query.get_or_404(id)
-#
-#
-#
-#
-
-# @workflow_page.route('/', methods=['POST'])
-# def post():
-#     errors = workflow_schema.validate(request.json)
-#     if errors:
-#         return errors, 400
-#
-#     # Verify that all workflow configs exist
-#     for node_start, node_children in request.json.get('node_dependencies', {}).items():
-#         nodes = [node_start]
-#         nodes += node_children
-#         for node in nodes:
-#             if not _config_exists(node):
-#                 return "{{\"node_dependencies\":[\"'{}' config does not exist\"]}}".format(node), 400
-#
-#     workflow = Workflow(**request.json)
-#     db.session.add(workflow)
-#     db.session.commit()
-#     return workflow_schema.dump(workflow), 201
-#     # TODO verify that graph is acyclic
-#     # for node in request.json.get('nodes', {}).items():
-#
-#
-# def _config_exists(config_name: str) -> bool:
-#     config = ConnectorConfig.query.filter_by(name=config_name).first()
-#     return config is not None
