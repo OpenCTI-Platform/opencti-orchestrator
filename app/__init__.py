@@ -92,4 +92,5 @@ def setup_heartbeat():
         seconds=scheduler.app.config["HEARTBEAT_INTERVAL"] / 2,
         args=[scheduler.app.config["HEARTBEAT_INTERVAL"]],
         id="heartbeat_service",
+        replace_existing=True,
     )

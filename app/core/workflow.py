@@ -1,6 +1,8 @@
 from typing import Optional
 
 from flask import has_app_context
+
+from app.core.heartbeat_service import AVAILABLE
 from app.core.models import Workflow, Run, RunConfig, ConnectorInstance
 from flask import current_app
 from pycti.connector.v2.libs.orchestrator_schemas import (
@@ -41,8 +43,8 @@ def verify_running_connectors(workflow: Workflow) -> bool:
             .query("exists", field="last_seen")
             .execute()
         ):
-            if instance.status == "available":
-                running_connector = False
+            if instance.status == AVAILABLE:
+                running_connector = True
 
         if not running_connector:
             raise ValueError(f"No running instance for connector {config.connector_id}")

@@ -149,8 +149,9 @@ def test_scheduled_workflow(test_client, caplog, clear_test_suite):
     (
         external_import_config_id,
         external_import_connector_id,
+        _,
     ) = create_connector_and_config_external_import(test_client)
-    stix_config_id, stix_connector_id = create_connector_and_config_stix(test_client)
+    stix_config_id, stix_connector_id, _ = create_connector_and_config_stix(test_client)
     workflow_id = create_scheduled_workflow(
         [stix_config_id, external_import_config_id], test_client
     )
