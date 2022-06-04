@@ -1,10 +1,9 @@
-from elasticsearch_dsl.exceptions import ValidationException
 from flask_openapi3 import APIBlueprint, Tag
 from pycti.connector.v2.libs.orchestrator_schemas import (
     Config as ConfigSchema,
     ConfigCreate,
 )
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from flask import make_response, jsonify
 from app.core.models import RunConfig, ErrorMessage
 
@@ -63,8 +62,10 @@ def post(body: ConfigCreate):
 
     try:
         connector_config_meta = config.save(return_doc_meta=True)
-    except ValidationException as e:
-        return make_response(jsonify(message=str(e)), 400)
+    # except ValidationException as e:
+    #     return make_response(e, 442)
+    except ValidationError as e:
+        return make_response(e.json(), 422)
 
     return make_response(jsonify(config.to_orm().dict()), 201)
 
@@ -89,8 +90,8 @@ def put(path: ConfigPath, body: ConfigCreate):
     config = RunConfig.get(id=path)
     try:
         connector_config_meta = config.update(**body)
-    except ValidationException as e:
-        return make_response(jsonify(message=str(e)), 400)
+    except ValidationError as e:
+        return make_response(e.json(), 422)
 
     return make_response(jsonify(config.to_orm().dict()), 201)
 

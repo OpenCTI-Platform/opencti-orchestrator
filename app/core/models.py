@@ -19,6 +19,7 @@ from app import INDEX_NAME
 from app.core.crud import validate_model
 from app.extensions import elastic
 from app.modules.elasticsearch import ChoicesKeyword
+from pydantic import ValidationError
 
 connectorUniqueSchema = ["uuid", "name", "queue"]
 
@@ -74,7 +75,6 @@ class Connector(BaseDocument):
         return ConnectorSchema(**self.to_dict(include_meta=True))
 
     def save(self, **kwargs):
-        print(f"{self.name} - {self.config_schema} ({type(self.config_schema)})")
         if self.config_schema and not validate_model(self.config_schema.to_dict()):
             raise ValueError("Invalid model transferred")
 
@@ -103,14 +103,17 @@ class RunConfig(BaseDocument):
         return ConfigSchema(**self.to_dict(include_meta=True))
 
     def save(self, **kwargs):
+        """
+        Throws ValidationError if pydantic model is invalid
+
+        :param kwargs:
+        :return: Updated object
+        """
         connector = Connector.get(id=self.connector_id)
         config_schema = connector.config_schema
 
-        if config_schema and not validate_model(
-            json.dumps(config_schema.to_dict()), self.config.to_dict()
-        ):
-            # TODO add missing/wrong fields to message
-            raise ValueError("Invalid model transferred")
+        if config_schema:
+            validate_model(json.dumps(config_schema.to_dict()), self.config.to_dict())
 
         return super(RunConfig, self).save(**kwargs)
 
@@ -169,8 +172,6 @@ class Workflow(BaseDocument):
     execution_args = Keyword(required=False)
 
     def create_run_instance(self, run_schema: RunCreate) -> Run:
-        # TODO this won't work, because meta['id'] of the Run doesn't
-        # exist yet
         job_status = []
         for config_id in self.jobs:
             job_status.append(

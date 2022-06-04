@@ -63,7 +63,6 @@ def validate_model(model_schema: dict | str, config: dict = None) -> bool | str:
     elif isinstance(model_schema, str):
         title = json.loads(model_schema).get("title")
         schema = model_schema
-    # elif isinstance(model_schema, InnerDocument)
     else:
         return False
 
@@ -90,9 +89,5 @@ def validate_model(model_schema: dict | str, config: dict = None) -> bool | str:
     if config is None:
         return True
 
-    try:
-        model.validate(config)
-    except ValidationError as e:
-        print(e)
-        return False
+    model.validate(config)
     return True
