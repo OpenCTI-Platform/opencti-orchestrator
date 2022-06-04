@@ -150,7 +150,8 @@ def run(path: WorkflowPath, body: RunCreate):
 
     # Create run instance
     if workflow.execution_type == ExecutionTypeEnum.triggered.value:
-        launch_run_instance(body, workflow)
+        run_instance = launch_run_instance(body, workflow)
+        return make_response(jsonify(run_instance.to_orm().dict()), 201)
     elif workflow.execution_type == ExecutionTypeEnum.scheduled.value:
         run_id = str(
             uuid.uuid4().hex
@@ -162,7 +163,10 @@ def run(path: WorkflowPath, body: RunCreate):
             args=[body, workflow],
             id=run_id,
         )
+        return make_response(
+            jsonify(message=f"Scheduled for run. First job ID {run_id}"), 201
+        )
     else:
         return make_response(jsonify(message="Fail, unsupported execution type"), 400)
 
-    return make_response(jsonify(message="Running"), 201)
+    # return make_response(jsonify(message="Running"), 201)

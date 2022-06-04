@@ -20,7 +20,6 @@ def launch_run_instance(run_schema: RunCreate, workflow: Workflow) -> Optional[R
     else:
         context = broker.app
     with context.app_context():
-        context.logger.info("running")
         try:
             verify_running_connectors(workflow)
         except ValueError as e:
