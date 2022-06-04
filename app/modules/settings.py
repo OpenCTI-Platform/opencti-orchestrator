@@ -1,6 +1,6 @@
 from typing import List, Literal
 from pydantic import root_validator
-from app.core.config import CustomBaseSettings
+from app.core.settings import CustomBaseSettings
 from app.modules.broker import BROKER_TYPES
 
 

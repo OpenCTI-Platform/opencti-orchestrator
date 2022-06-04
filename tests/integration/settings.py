@@ -1,4 +1,4 @@
-from app.modules.config import CustomBaseSettings
+from app.modules.settings import CustomBaseSettings
 
 
 def test_yaml_settings():

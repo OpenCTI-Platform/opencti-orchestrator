@@ -72,10 +72,9 @@ class YamlSettingsSource:
     __slots__ = ("yaml_file",)
 
     def __init__(self, yaml_file: StrPath):
-        self.yaml_file = yaml_file
+        self.yaml_file: StrPath = yaml_file
 
     def __call__(self, settings: BaseSettings) -> Dict[str, Any]:
-        # encoding = settings.__config__.yaml_file
         path = Path(self.yaml_file)
         content = {}
         if path.exists():
