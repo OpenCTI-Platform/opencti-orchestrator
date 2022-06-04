@@ -8,6 +8,7 @@ brokers = {
     "RABBITMQ": pika_broker.PikaBroker,
     "STDOUT": std_broker.StdBroker,
 }
+BROKER_TYPES = tuple(brokers.keys())
 
 
 class BrokerHandler(object):
