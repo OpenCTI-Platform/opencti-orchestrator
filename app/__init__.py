@@ -1,11 +1,12 @@
 import logging
+import click
+from flask.cli import with_appcontext
 from flask_openapi3 import Info, OpenAPI
 from pydantic.error_wrappers import ValidationError
 from apscheduler.schedulers import (
     SchedulerAlreadyRunningError,
     SchedulerNotRunningError,
 )
-
 from app.modules.config import FlaskSettings
 
 
@@ -21,8 +22,7 @@ schedule_logger = logging.getLogger("apscheduler")
 schedule_logger.setLevel(logging.CRITICAL)
 
 
-def create_app(config_path: str):
-    # app = Flask(__name__, instance_relative_config=True)
+def create_app(config_path: str, run_heartbeat: bool = True):
     info = Info(
         title="OpenCTI Orchestrator", version="1.0.0"
     )  # TODO get this version from setup.py
@@ -37,8 +37,8 @@ def create_app(config_path: str):
     initialize_extensions(app)
     register_blueprints(app)
     # appcontext_tearing_down.connect(shutdown)
-    # TODO start heartbeat service
-    setup_heartbeat()
+    if run_heartbeat:
+        setup_heartbeat()
 
     return app
 
@@ -83,6 +83,8 @@ def register_blueprints(app):
     app.register_api(heartbeat_page)
     app.register_api(run_page)
 
+    app.cli.add_command(recreate_db)
+
 
 def setup_heartbeat():
     from app.core.heartbeat_service import heartbeat_service
@@ -96,3 +98,29 @@ def setup_heartbeat():
         id="heartbeat_service",
         replace_existing=True,
     )
+
+
+@click.command("recreate-db")
+@with_appcontext
+def recreate_db():
+    from app.extensions import elastic
+    from app.core.models import (
+        Connector,
+        RunConfig,
+        ConnectorInstance,
+        Run,
+        Workflow,
+        BaseDocument,
+    )
+
+    BaseDocument._index.delete(ignore=[400, 404], using=elastic.connection)
+
+    Connector.init(using=elastic.connection)
+    ConnectorInstance.init(using=elastic.connection)
+    RunConfig.init(using=elastic.connection)
+    Workflow.init(using=elastic.connection)
+    Run.init(using=elastic.connection)
+
+    elastic.connection.indices.refresh(index=INDEX_NAME)
+
+    print("Flushed database")
