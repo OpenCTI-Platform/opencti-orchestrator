@@ -1,18 +1,17 @@
-from pathlib import Path
-from typing import List, Any, Dict
-from apscheduler.jobstores.redis import RedisJobStore
-import yaml
-from pydantic import BaseSettings, root_validator
+from typing import List, Literal
+from pydantic import root_validator
+from app.core.config import CustomBaseSettings
+from app.modules.broker import BROKER_TYPES
 
 
-class FlaskSettings(BaseSettings):
+class FlaskSettings(CustomBaseSettings):
     # DB Settings
     ELASTICSEARCH_HOST: str | List[str]
     ELASTICSEARCH_HTTP_AUTH: str = None
     # Heartbeat
     HEARTBEAT_INTERVAL: int = 10  # interval in seconds
     # Broker Settings
-    BROKER: str = "RabbitMQ"
+    BROKER: Literal[BROKER_TYPES] = "RabbitMQ"
     RABBITMQ_HOST: str
     RABBITMQ_PORT: int = 5672
     RABBITMQ_USER: str
@@ -42,39 +41,3 @@ class FlaskSettings(BaseSettings):
             }
         }
         return values
-
-    class Config:
-        @classmethod
-        def customise_sources(
-            cls,
-            init_settings,
-            env_settings,
-            file_secret_settings,
-        ):
-            return (
-                init_settings,
-                yml_config_setting,
-                # json_config_setting,
-                env_settings,
-                file_secret_settings,
-            )
-
-
-def yml_config_setting(settings: BaseSettings) -> Dict[str, Any]:
-    encoding = settings.__config__.env_file_encoding
-    path = Path("config.yml")
-    content = {}
-    if path.exists():
-        with open(path, "r", encoding=encoding) as f:
-            content = yaml.safe_load(f)
-    return content
-
-
-#
-# def json_config_setting(settings: BaseSettings) -> Dict[str, Any]:
-#     encoding = settings.__config__.env_file_encoding
-#     path = Path('config.json')
-#     content = {}
-#     if path.exists():
-#         content = json.loads(Path('config.json').read_text(encoding))
-#     return content

@@ -17,16 +17,18 @@ logging.basicConfig(level=logging.INFO)
 # TODO add verification that the index exists
 elastic_logger = logging.getLogger("elasticsearch")
 elastic_logger.setLevel(logging.CRITICAL)
+schedule_logger = logging.getLogger("apscheduler")
+schedule_logger.setLevel(logging.CRITICAL)
 
 
-def create_app(config_filename=None):
+def create_app(config_path: str):
     # app = Flask(__name__, instance_relative_config=True)
     info = Info(
         title="OpenCTI Orchestrator", version="1.0.0"
     )  # TODO get this version from setup.py
     app = OpenAPI(__name__, info=info)
     try:
-        app.config.from_object(FlaskSettings())
+        app.config.from_object(FlaskSettings(_yaml_file=config_path))
     except ValidationError as e:
         app.logger.error(e)
         return None

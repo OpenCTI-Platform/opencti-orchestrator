@@ -1,0 +1,6 @@
+ELASTICSEARCH_HOST: "http://elastic:9200"
+BROKER: "RABBITMQ"
+RABBITMQ_HOST: "rabbitmq"
+RABBITMQ_USER: "Changeme"
+RABBITMQ_PASSWORD: "Changeme"
+REDIS_HOST: "redis"

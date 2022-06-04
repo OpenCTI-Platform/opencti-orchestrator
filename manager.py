@@ -11,7 +11,7 @@ from app.core.models import (
     BaseDocument,
 )
 
-app = create_app()
+app = create_app("config/config.yml")
 cli = FlaskGroup(create_app=create_app)
 
 
