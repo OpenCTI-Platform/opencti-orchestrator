@@ -25,4 +25,5 @@ def heartbeat_service(interval: int):
                 else:
                     status = UNAVAILABLE
 
-                instance.update(status=status)
+                if instance.status != status:
+                    instance.update(status=status)
