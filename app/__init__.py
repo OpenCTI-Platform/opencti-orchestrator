@@ -7,7 +7,7 @@ from apscheduler.schedulers import (
     SchedulerAlreadyRunningError,
     SchedulerNotRunningError,
 )
-from app.modules.config import FlaskSettings
+from app.modules.settings import FlaskSettings
 
 
 INDEX_NAME = "opencti_orchestrator"
