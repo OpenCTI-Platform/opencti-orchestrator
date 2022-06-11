@@ -30,7 +30,9 @@ jobs:
           command: flake8 --ignore=E,W ~/repo
   tests:
     docker:
-      - image: cimg/python:3.9
+      - image: cimg/python:3.10
+    environment:
+      FLASK_APP: app:create_app('config/test-config.yml', False)
     steps:
       - checkout
       - run:
