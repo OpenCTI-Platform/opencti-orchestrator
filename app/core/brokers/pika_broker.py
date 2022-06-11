@@ -6,17 +6,14 @@ from app.core.utils import BrokerClass
 
 class PikaBroker(BrokerClass):
     def send_message(self, run_container: RunContainer):
-
+        print(f"Sending off container {run_container}")
         with self.app.app_context():
-            # TODO
-            # get first ID and queue
-            # start sending stuff there
             pika_credentials = pika.PlainCredentials(
                 self.app.config["RABBITMQ_USER"], self.app.config["RABBITMQ_PASSWORD"]
             )
             connection = pika.BlockingConnection(
                 pika.ConnectionParameters(
-                    host=self.app.config["RABBITMQ_HOST"],
+                    host=self.app.config["RABBITMQ_HOSTNAME"],
                     port=5672,
                     credentials=pika_credentials,
                 )
@@ -29,7 +26,7 @@ class PikaBroker(BrokerClass):
             channel.basic_publish(
                 exchange="",
                 routing_key=job.queue,
-                body=b"running",
+                body=run_container.json(),
                 properties=pika.BasicProperties(
                     delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE
                 ),
