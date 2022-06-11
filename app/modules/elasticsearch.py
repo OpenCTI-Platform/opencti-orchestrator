@@ -21,7 +21,7 @@ class FlaskElasticsearch(object):
         app.teardown_appcontext(self.teardown)
 
     def connect(self, kwargs) -> Elasticsearch:
-        if isinstance(self.app.config.get("ELASTICSEARCH_HOST"), str):
+        if isinstance(self.app.config.get("ELASTICSEARCH_URL"), str):
             hosts = [self.app.config.get("ELASTICSEARCH_HOST")]
         elif isinstance(self.app.config.get("ELASTICSEARCH_HOST"), list):
             hosts = self.app.config.get("ELASTICSEARCH_HOST")
