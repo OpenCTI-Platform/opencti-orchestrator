@@ -1,12 +1,8 @@
 import time
-from datetime import datetime
 from flask import make_response, jsonify
 from flask_openapi3 import APIBlueprint, Tag
 from pydantic import BaseModel, Field
-
 from app.core.models import ConnectorInstance
-
-# from app.extensions import db
 
 tag = Tag(name="heartbeat", description="Heartbeat Management")
 heartbeat_page = APIBlueprint(
