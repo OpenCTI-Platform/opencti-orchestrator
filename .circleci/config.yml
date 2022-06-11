@@ -1,4 +1,3 @@
----
 version: 2.1
 
 jobs:
@@ -41,15 +40,12 @@ jobs:
           name: install test-dependencies
           command: pip install -r test-requirements.txt --user
       - run:
-          name: install pytest
-          command: pip install pytest pytest-cov --user
-      - run:
           name: run pytest
           command: python3 -m pytest --cov=pycti
 
 workflows:
   version: 2
-  opencti_client_python:
+  orchestrator_python:
     jobs:
       - ensure_formatting:
           filters:
