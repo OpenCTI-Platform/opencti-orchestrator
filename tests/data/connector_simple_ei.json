@@ -1,0 +1,6 @@
+{
+  "connector_id": "8f2c1ba7-56c7-4e1a-9762-a192776397a9",
+  "name": "Simple External IP Importer",
+  "queue": "seip",
+  "type": "EXTERNAL_IMPORT"
+}

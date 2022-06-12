@@ -1,0 +1,6 @@
+{
+  "connector_id": "8f2c1ba7-11c7-4e1a-9762-a192776397a9",
+  "name": "AbuseIP Enrichment",
+  "queue": "abuseip",
+  "type": "INTERNAL_ENRICHMENT"
+}
