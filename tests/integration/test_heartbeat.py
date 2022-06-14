@@ -3,7 +3,7 @@ import logging
 import time
 
 from tests.utils.connector_creators import create_connector_and_config_stix
-from pycti.connector.v2.libs.orchestrator_schemas import Instance
+from pycti.connector.new.libs.orchestrator_schemas import Instance
 
 
 def test_heartbeat(test_client, caplog):

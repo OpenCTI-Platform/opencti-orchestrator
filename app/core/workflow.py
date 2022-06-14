@@ -5,7 +5,7 @@ from flask import has_app_context
 from app.core.heartbeat_service import AVAILABLE
 from app.core.models import Workflow, Run, RunConfig, ConnectorInstance
 from flask import current_app
-from pycti.connector.v2.libs.orchestrator_schemas import (
+from pycti.connector.new.libs.orchestrator_schemas import (
     State,
     Result,
     RunContainer,

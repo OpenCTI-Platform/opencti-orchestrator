@@ -2,7 +2,7 @@ import json
 
 from elasticsearch_dsl import Document, Date, Keyword, Object, InnerDoc, Nested, Integer
 from pycti import ConnectorType
-from pycti.connector.v2.libs.orchestrator_schemas import (
+from pycti.connector.new.libs.orchestrator_schemas import (
     State,
     RunContainer,
     RunCreate,

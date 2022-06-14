@@ -1,5 +1,5 @@
 from flask_openapi3 import APIBlueprint, Tag
-from pycti.connector.v2.libs.orchestrator_schemas import (
+from pycti.connector.new.libs.orchestrator_schemas import (
     Config as ConfigSchema,
     ConfigCreate,
 )

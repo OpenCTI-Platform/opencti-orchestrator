@@ -1,6 +1,6 @@
 import json
 from flask import Request
-from pycti.connector.v2.libs.orchestrator_schemas import RunContainer
+from pycti.connector.new.libs.orchestrator_schemas import RunContainer
 
 
 class BrokerClass(object):

@@ -1,15 +1,9 @@
 import json
 import time
-import uuid
-from typing import List
-
 import pytest
 from elasticsearch_dsl import Search
-from pycti import ConnectorType
-from pydantic.main import BaseModel
-
 from app import INDEX_NAME
-from pycti.connector.v2.libs.orchestrator_schemas import (
+from pycti.connector.new.libs.orchestrator_schemas import (
     RunCreate,
     RunUpdate,
     Run,

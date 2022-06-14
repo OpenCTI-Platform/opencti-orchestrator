@@ -16,6 +16,7 @@ MarkupSafe==2.1.1
 marshmallow==3.15.0
 packaging==21.3
 pika==1.2.0
+git+https://github.com/nor3th/client-python@connector_base_dev
 pyparsing==3.0.7
 python-dateutil==2.8.2
 pytz==2022.1
