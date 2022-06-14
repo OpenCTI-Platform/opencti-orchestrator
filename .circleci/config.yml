@@ -28,22 +28,22 @@ jobs:
       - run:
           name: flake8
           command: flake8 --ignore=E,W ~/repo
-  tests:
-    docker:
-      - image: cimg/python:3.10
-    environment:
-      FLASK_APP: app:create_app('config/test-config.yml', False)
-    steps:
-      - checkout
-      - run:
-          name: install dependencies
-          command: pip install -r requirements.txt --user
-      - run:
-          name: install test-dependencies
-          command: pip install -r test-requirements.txt --user
-      - run:
-          name: run pytest
-          command: python3 -m pytest --cov=pycti
+#  tests:
+#    docker:
+#      - image: cimg/python:3.10
+#    environment:
+#      FLASK_APP: app:create_app('config/test-config.yml', False)
+#    steps:
+#      - checkout
+#      - run:
+#          name: install dependencies
+#          command: pip install -r requirements.txt --user
+#      - run:
+#          name: install test-dependencies
+#          command: pip install -r test-requirements.txt --user
+#      - run:
+#          name: run pytest
+#          command: python3 -m pytest --cov=pycti
 
 workflows:
   version: 2
@@ -57,7 +57,7 @@ workflows:
           filters:
             tags:
               only: /.*/    
-      - tests:
-          filters:
-            tags:
-              only: /.*/      
+#      - tests:
+#          filters:
+#            tags:
+#              only: /.*/
