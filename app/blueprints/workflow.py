@@ -41,12 +41,12 @@ class WorkflowPath(BaseModel):
     "/",
     summary="Get all workflows",
     description="Get all Workflows",
-    # responses={"201": HeartBeatResponse, "404": HeartBeatResponse},
+    responses={"200": WorkflowSchema, "404": ErrorMessage},
 )
 def get_all():
-    workflows = {}  # Workflow.query.all()
-    # TODO implement
-    return make_response(jsonify(workflows), 200)
+    results = Workflow.get_all()
+    results = [workflow.to_orm().dict() for workflow in results]
+    return make_response(jsonify(results, 200))
 
 
 @workflow_page.get(

@@ -28,20 +28,19 @@ class ConnectorPath(BaseModel):
     "",
     summary="Get all Connectors",
     description="Get all existing connectors",
-    responses={"201": ConnectorSchema, "404": ErrorMessage},
+    responses={"200": ConnectorSchema, "404": ErrorMessage},
 )
 def get_all():
-    connectors = {}  # Connector.query.all()
-    # TODO implement
-    # return connectors_schema.dumps(connectors)
-    return connectors, 200
+    results = Connector.get_all()
+    results = [run.to_orm().dict() for run in results]
+    return make_response(jsonify(results, 200))
 
 
 @connector_page.get(
     "/<string:connector_id>",
     summary="Get Connector",
     description="Get existing Connector",
-    responses={"201": ConnectorSchema, "404": ErrorMessage},
+    responses={"200": ConnectorSchema, "404": ErrorMessage},
 )
 def get(path: ConnectorPath):
     connector = Connector.get(id=path.connector_id)
@@ -128,6 +127,7 @@ def post(body: ConnectorCreate):
     config = {
         "environment": {
             "broker": {
+                # TODO read broker settings dynamically
                 "type": "pika",
                 "user": current_app.config["RABBITMQ_USER"],
                 "password": current_app.config["RABBITMQ_PASSWORD"],
@@ -137,7 +137,7 @@ def post(body: ConnectorCreate):
             "heartbeat": {
                 "interval": current_app.config["HEARTBEAT_INTERVAL"],
             },
-            "opencti": current_app.config["OPENCTI"],
+            "opencti": current_app.config["OPENCTI_URL"],
         },
         "connector_instance": connector_instance_meta["_id"],
         "connector": connector.to_orm().dict(),

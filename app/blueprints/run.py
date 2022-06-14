@@ -20,10 +20,21 @@ class RunPath(BaseModel):
 
 
 @run_page.get(
+    "/",
+    summary="Get all Runs",
+    description="Get all Rusn",
+    responses={"200": RunSchema, "400": ErrorMessage},
+)
+def get_all():
+    results = Run.get_all()
+    results = [run.to_orm().dict() for run in results]
+    return make_response(jsonify(results, 200))
+
+@run_page.get(
     "/<string:run_id>",
     summary="Get Run",
     description="Get Run",
-    responses={"201": RunSchema, "400": ErrorMessage},
+    responses={"200": RunSchema, "400": ErrorMessage},
 )
 def get(path: RunPath):
     run = Run.get(id=path.run_id)

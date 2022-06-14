@@ -19,19 +19,19 @@ class ConfigPath(BaseModel):
     "/",
     summary="Get all Configs",
     description="Get all Configs",
-    responses={"201": ConfigSchema, "404": ErrorMessage},
+    responses={"200": ConfigSchema, "404": ErrorMessage},
 )
 def get_all():
-    configs = {}  # ConnectorRunConfig.query.all()
-    # TODO implement
-    return configs, 200  # connector_configs_schema.dumps(configs)
+    results = RunConfig.get_all()
+    results = [run.to_orm().dict() for run in results]
+    return make_response(jsonify(results, 200))
 
 
 @config_page.get(
     "/<string:config_id>",
     summary="Get Config",
     description="Get Config",
-    responses={"201": ConfigSchema, "404": ErrorMessage},
+    responses={"200": ConfigSchema, "404": ErrorMessage},
 )
 def get(path: ConfigPath):
     config = RunConfig.get(id=path.config_id)
