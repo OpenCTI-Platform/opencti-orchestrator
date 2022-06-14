@@ -1,10 +1,14 @@
+import logging
 from typing import List, Literal
-from pydantic import root_validator
+from pydantic import root_validator, validator
 from app.core.settings import CustomBaseSettings
 from app.modules.broker import BROKER_TYPES
 
+LOG_LEVELS = ("DEBUG_ALL",) + tuple(logging._levelToName.values())
+
 
 class FlaskSettings(CustomBaseSettings):
+    LOGGING: Literal[LOG_LEVELS] = "INFO"
     # OpenCTI
     OPENCTI_URL: str
     # DB Settings
@@ -14,10 +18,10 @@ class FlaskSettings(CustomBaseSettings):
     HEARTBEAT_INTERVAL: int = 10  # interval in seconds
     # Broker Settings
     BROKER: Literal[BROKER_TYPES] = "RabbitMQ"
-    RABBITMQ_HOSTNAME: str
+    RABBITMQ_HOSTNAME: str = None
     RABBITMQ_PORT: int = 5672
-    RABBITMQ_USER: str
-    RABBITMQ_PASSWORD: str
+    RABBITMQ_USER: str = None
+    RABBITMQ_PASSWORD: str = None
     # Scheduler Settings
     SCHEDULER_API_ENABLED: bool = False
     SCHEDULER_JOBSTORES: dict = {"apscheduler.jobstores.default": {}}
@@ -43,3 +47,7 @@ class FlaskSettings(CustomBaseSettings):
             }
         }
         return values
+
+    # @root_validator
+    # def pre_broker_validator(cls, values: dict):
+    #     if values.get("BROKER") == BROKER_TYPES.index(0)
