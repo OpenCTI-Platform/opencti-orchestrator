@@ -16,7 +16,9 @@ def heartbeat_service(interval: int):
                 f"Running connector {connector.name} ({connector.meta.id})"
             )
 
-            results = ConnectorInstance.get_all(filters=[{"connector_id": connector.meta.id}])
+            results = ConnectorInstance.get_all(
+                filters=[{"connector_id": connector.meta.id}]
+            )
 
             for instance in results:
                 scheduler.app.logger.debug(

@@ -59,7 +59,9 @@ class BaseDocument(Document):
         return super(BaseDocument, self).delete(**kwargs, using=elastic.connection)
 
     @classmethod
-    def get_all(cls, filters: list[dict] = None, queries: list[str] = None) -> list[Document]:
+    def get_all(
+        cls, filters: list[dict] = None, queries: list[str] = None
+    ) -> list[Document]:
         search = cls.search()
         if filters is None:
             filters = []
@@ -239,6 +241,7 @@ class Workflow(BaseDocument):
     def get_all(cls, filters: list[dict] = None) -> list[BaseDocument]:
         unique = ["jobs"]
         return BaseDocument.get_all(filters, unique)
+
 
 # class Workflow(db.Model):
 #     id = db.Column(db.Integer, primary_key=True)
