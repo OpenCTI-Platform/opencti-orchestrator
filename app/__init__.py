@@ -9,17 +9,8 @@ from apscheduler.schedulers import (
 )
 from app.modules.settings import FlaskSettings
 
-
-INDEX_NAME = "opencti_orchestrator"
-
-logging.basicConfig(level=logging.INFO)
-
-# TODO enable elasticsearch logging again when logging is set to DEBUG
 # TODO add verification that the index exists
-elastic_logger = logging.getLogger("elasticsearch")
-elastic_logger.setLevel(logging.CRITICAL)
-schedule_logger = logging.getLogger("apscheduler")
-schedule_logger.setLevel(logging.CRITICAL)
+INDEX_NAME = "opencti_orchestrator"
 
 
 def create_app(config_path: str, run_heartbeat: bool = True):
@@ -27,12 +18,20 @@ def create_app(config_path: str, run_heartbeat: bool = True):
         title="OpenCTI Orchestrator", version="1.0.0"
     )  # TODO get this version from setup.py
     app = OpenAPI(__name__, info=info)
+
     try:
         app.config.from_object(FlaskSettings(_yaml_file=config_path))
     except ValidationError as e:
         app.logger.error(e)
         return None
-        # better handling than None
+
+    logging_level = app.config.get("LOGGING")
+    logging.basicConfig(level=logging_level)
+    if logging_level != "DEBUG_ALL":
+        elastic_logger = logging.getLogger("elasticsearch")
+        elastic_logger.setLevel(logging.CRITICAL)
+        schedule_logger = logging.getLogger("apscheduler")
+        schedule_logger.setLevel(logging.INFO)
 
     initialize_extensions(app)
     register_blueprints(app)
