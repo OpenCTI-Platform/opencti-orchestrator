@@ -58,6 +58,27 @@ class BaseDocument(Document):
     def delete(self, using=None, index=None, **kwargs):
         return super(BaseDocument, self).delete(**kwargs, using=elastic.connection)
 
+    @classmethod
+    def get_all(cls, filters: list[dict] = None, queries: list[str] = None) -> list[Document]:
+        search = cls.search()
+        if filters is None:
+            filters = []
+
+        if queries is None:
+            queries = []
+
+        for search_filter in filters:
+            search = search.filter("term", **search_filter)
+
+        for query in queries:
+            search = search.query("exists", field=query)
+
+        total = search.count()
+        search = search[0:total]
+        results = search.execute()
+
+        return results
+
     class Index:
         name = INDEX_NAME
 
@@ -80,6 +101,11 @@ class Connector(BaseDocument):
 
         return super(Connector, self).save(**kwargs)
 
+    @classmethod
+    def get_all(cls, filters: list[dict] = None) -> list[BaseDocument]:
+        unique = ["uuid"]
+        return BaseDocument.get_all(filters, unique)
+
 
 class ConnectorInstance(BaseDocument):
     last_seen = Integer(required=True)
@@ -88,6 +114,11 @@ class ConnectorInstance(BaseDocument):
 
     def to_orm(self):
         return InstanceSchema(**self.to_dict(include_meta=True))
+
+    @classmethod
+    def get_all(cls, filters: list[dict] = None) -> list[BaseDocument]:
+        unique = ["last_seen"]
+        return BaseDocument.get_all(filters, unique)
 
 
 connectorRunConfigUniqueSchema = ["name"]
@@ -102,7 +133,7 @@ class RunConfig(BaseDocument):
     def to_orm(self):
         return ConfigSchema(**self.to_dict(include_meta=True))
 
-    def save(self, **kwargs):
+    def save(self, **kwargs) -> BaseDocument:
         """
         Throws ValidationError if pydantic model is invalid
 
@@ -116,6 +147,11 @@ class RunConfig(BaseDocument):
             validate_model(json.dumps(config_schema.to_dict()), self.config.to_dict())
 
         return super(RunConfig, self).save(**kwargs)
+
+    @classmethod
+    def get_all(cls, filters: list[dict] = None) -> list[BaseDocument]:
+        unique = ["config"]
+        return BaseDocument.get_all(filters, unique)
 
 
 class JobStatus(InnerDoc):
@@ -161,6 +197,11 @@ class Run(BaseDocument):
     def to_orm(self):
         return RunSchema(**self.to_dict(include_meta=True))
 
+    @classmethod
+    def get_all(cls, filters: list[dict] = None) -> list[BaseDocument]:
+        unique = ["workflow_id", "work_id"]
+        return BaseDocument.get_all(filters, unique)
+
 
 class Workflow(BaseDocument):
     # name = Keyword(required=True) # TODO make unique
@@ -194,6 +235,10 @@ class Workflow(BaseDocument):
     def to_orm(self):
         return WorkflowSchema(**self.to_dict(include_meta=True))
 
+    @classmethod
+    def get_all(cls, filters: list[dict] = None) -> list[BaseDocument]:
+        unique = ["jobs"]
+        return BaseDocument.get_all(filters, unique)
 
 # class Workflow(db.Model):
 #     id = db.Column(db.Integer, primary_key=True)
