@@ -7,8 +7,6 @@ from app.core.models import Workflow, Run, RunConfig, ConnectorInstance
 from flask import current_app
 from pycti.connector.new.libs.orchestrator_schemas import (
     State,
-    Result,
-    RunContainer,
     RunCreate,
 )
 from app.extensions import broker
@@ -34,18 +32,12 @@ def launch_run_instance(run_schema: RunCreate, workflow: Workflow) -> Optional[R
 
 def verify_running_connectors(workflow: Workflow) -> bool:
     for config_id in workflow.jobs:
-        running_connector = False
-        config = RunConfig.get(id=config_id)
-        for instance in (
-            ConnectorInstance.search()
-            .filter("term", connector_id=config.connector_id)
-            .query("exists", field="last_seen")
-            .execute()
-        ):
-            if instance.status == AVAILABLE:
-                running_connector = True
+        config: RunConfig = RunConfig.get(id=config_id)
+        result = ConnectorInstance.get_all(
+            filters=[{"status": AVAILABLE}, {"connector_id": config.connector_id}]
+        )
 
-        if not running_connector:
+        if len(result) == 0:
             raise ValueError(f"No running instance for connector {config.connector_id}")
 
     return True
