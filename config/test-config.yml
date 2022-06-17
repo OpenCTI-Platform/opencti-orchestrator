@@ -1,4 +1,6 @@
+LOGGING: "DEBUG"
 OPENCTI_URL: "https://opencti"
 ELASTICSEARCH_URL: "http://elasticsearch:9200"
 BROKER: "STDOUT"
 REDIS_HOSTNAME: "redis"
+HEARTBEAT_INTERVAL: 10
