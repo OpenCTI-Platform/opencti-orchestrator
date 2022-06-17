@@ -4,7 +4,6 @@ from pycti.connector.new.libs.orchestrator_schemas import (
     Result,
     RunUpdate,
     Run as RunSchema,
-    RunCreate,
 )
 from flask import jsonify, make_response
 from pydantic import BaseModel, Field
@@ -19,14 +18,18 @@ class RunPath(BaseModel):
     run_id: str = Field("run_id", description="ID of connector instance")
 
 
+class RunQuery(BaseModel):
+    status: str
+
+
 @run_page.get(
     "/",
     summary="Get all Runs",
     description="Get all Rusn",
     responses={"200": RunSchema, "400": ErrorMessage},
 )
-def get_all():
-    results = Run.get_all()
+def get_all(query: RunQuery):
+    results = Run.get_all(filters=[{"status": query.status}])
     results = [run.to_orm().dict() for run in results]
     return make_response(jsonify(results, 200))
 
@@ -115,9 +118,13 @@ def update(path: RunPath, body: RunUpdate):
     "/<string:run_id>",
     summary="Delete Run",
     description="Delete Run",
-    # responses={"201": RunSchema, "404": ErrorMessage},
+    responses={"204": BaseModel, "404": ErrorMessage},
 )
 def delete(path: RunPath):
-    # remove run
-    # also remove scheduled job if scheduled setting
-    pass
+    # TODO remove also scheduled
+    run = Run.get(id=path.run_id)
+    if not run:
+        return make_response(jsonify(message="Not Found"), 404)
+
+    run.delete()
+    return make_response(jsonify(), 204)
