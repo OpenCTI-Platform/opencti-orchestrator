@@ -1,4 +1,3 @@
-from typing import Optional, List
 from app.core.brokers import pika_broker, std_broker
 from flask import _app_ctx_stack
 

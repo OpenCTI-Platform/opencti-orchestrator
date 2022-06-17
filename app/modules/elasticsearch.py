@@ -1,4 +1,4 @@
-from typing import Optional, List, Tuple, Union
+from typing import List, Tuple, Union
 
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Keyword
@@ -28,8 +28,7 @@ class FlaskElasticsearch(object):
         else:
             raise ValueError("No host defined")
 
-        # hosts = self.app.config.get("ELASTICSEARCH_HOST", None)
-        auth = (self.app.config.get("ELASTICSEARCH_HTTP_AUTH", None),)
+        # auth = (self.app.config.get("ELASTICSEARCH_HTTP_AUTH", None),)
         elastic = Elasticsearch(
             hosts=hosts,
             # http_auth=auth,

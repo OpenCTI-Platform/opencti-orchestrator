@@ -1,6 +1,6 @@
 import logging
 from typing import List, Literal
-from pydantic import root_validator, validator
+from pydantic import root_validator
 from app.core.settings import CustomBaseSettings
 from app.modules.broker import BROKER_TYPES
 
