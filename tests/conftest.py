@@ -1,4 +1,4 @@
-from app import create_app, recreate_db, INDEX_NAME
+from app import create_app, INDEX_NAME
 import pytest
 
 
