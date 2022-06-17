@@ -1,7 +1,4 @@
-# from app.schemas import connector_schema, connectors_schema
 import time
-from datetime import datetime
-
 from elasticsearch_dsl import Q
 from elasticsearch_dsl.exceptions import ValidationException
 from flask import current_app, make_response, jsonify
@@ -60,31 +57,31 @@ def post(body: ConnectorCreate):
     connector = Connector(**body.dict())
 
     # TODO use facetted search
-    single_result = (
-        Connector.search()
-        .query(
-            "bool",
-            filter=[
-                Q("term", uuid=connector.uuid)
-                | Q("term", name=connector.name)
-                | Q("term", queue=connector.queue)
-            ],
-        )
-        .exclude(
-            "bool",
-            filter=[
-                Q("term", uuid=connector.uuid)
-                & Q("term", name=connector.name)
-                & Q("term", queue=connector.queue)
-            ],
-        )
-        .execute()
-    )
-    if len(single_result) > 0:
-        result = [f"Connector({i.uuid}, {i.name}, {i.queue})" for i in single_result]
-        return make_response(
-            jsonify(f"{{Chosen fields are not unique: {result} }}"), 400
-        )
+    # single_result = (
+    #     Connector.search()
+    #     .query(
+    #         "bool",
+    #         filter=[
+    #             Q("term", uuid=connector.uuid)
+    #             | Q("term", name=connector.name)
+    #             | Q("term", queue=connector.queue)
+    #         ],
+    #     )
+    #     .exclude(
+    #         "bool",
+    #         filter=[
+    #             Q("term", uuid=connector.uuid)
+    #             & Q("term", name=connector.name)
+    #             & Q("term", queue=connector.queue)
+    #         ],
+    #     )
+    #     .execute()
+    # )
+    # if len(single_result) > 0:
+    #     result = [{"uuid": i.uuid, "name": i.name, "queue": i.queue} for i in single_result]
+    #     return make_response(
+    #         jsonify(message="Chosen fields are not unique", data=result), 400
+    #     )
 
     result = (
         Connector.search()
@@ -98,26 +95,35 @@ def post(body: ConnectorCreate):
         )
         .execute()
     )
+    tmp_result = [
+        {"uuid": i.uuid, "name": i.name, "queue": i.queue, "id": i.meta.id}
+        for i in result
+    ]
     if len(result) > 1:
-        summary = [f"Connector({i.uuid}, {i.name}, {i.queue})" for i in result]
         return make_response(
             jsonify(
-                f"More than 1 connector registered, please delete one of those ids {summary}"
+                message="Multiple documents holding the same values", data=tmp_result
             ),
             400,
         )
-
     elif len(result) == 1:
         # Using existing connector, only create new instance
         connector_id = result[0].meta["id"]
-        connector = Connector.get(id=result[0].meta["id"])
+        connector = Connector.get(id=connector_id)
+        if connector is None:
+            return make_response(
+                jsonify(
+                    message=f"No connector found with id {connector_id} {tmp_result}"
+                ),
+                400,
+            )
     else:
         # Create new connector
         try:
             connector_info_meta = connector.save(return_doc_meta=True)
             connector_id = connector_info_meta["_id"]
         except ValidationException as e:
-            return make_response(jsonify(str(e)), 400)
+            return make_response(jsonify(message=str(e)), 400)
 
     connector_instance = ConnectorInstance(
         last_seen=int(time.time()), connector_id=connector_id, status="available"
@@ -149,7 +155,7 @@ def post(body: ConnectorCreate):
     "/<string:connector_id>",
     summary="Delete Connector",
     description="Delete connector",
-    # responses={"201": "", "404": ErrorMessage},
+    responses={"204": BaseModel, "404": ErrorMessage},
 )
 def delete(path: ConnectorPath):
     connector = Connector.get(id=path.connector_id)

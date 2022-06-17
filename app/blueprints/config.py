@@ -61,7 +61,7 @@ def post(body: ConfigCreate):
     #     return f"{{'uuid': 'value \"{json_data['uuid']}\" already exists}}", 400
 
     try:
-        connector_config_meta = config.save(return_doc_meta=True)
+        config.save(return_doc_meta=True)
     # except ValidationException as e:
     #     return make_response(e, 442)
     except ValidationError as e:
@@ -89,7 +89,7 @@ def put(path: ConfigPath, body: ConfigCreate):
 
     config = RunConfig.get(id=path)
     try:
-        connector_config_meta = config.update(**body)
+        config.update(**body)
     except ValidationError as e:
         return make_response(e.json(), 422)
 

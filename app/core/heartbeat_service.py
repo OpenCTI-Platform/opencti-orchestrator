@@ -12,17 +12,13 @@ def heartbeat_service(interval: int):
         scheduler.app.logger.debug("Heartbeat running")
 
         for connector in Connector.search().query("exists", field="uuid").execute():
-            scheduler.app.logger.debug(
-                f"Running connector {connector.name} ({connector.meta.id})"
-            )
-
             results = ConnectorInstance.get_all(
                 filters=[{"connector_id": connector.meta.id}]
             )
 
             for instance in results:
-                scheduler.app.logger.debug(
-                    f"Instance {instance.meta.id} {instance.status}"
+                scheduler.app.logger.info(
+                    f"Heartbeat verification instance {instance.meta.id} {instance.status}"
                 )
                 if instance.last_seen > (time.time() - interval):
                     status = AVAILABLE

@@ -5,10 +5,7 @@ import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-# from elasticsearch_dsl import Q
-# from pycti.connector.new.libs.orchestrator_schemas import ConnectorCreate, Connector as ConnectorSchema
 from datamodel_code_generator import generate, InputFileType
-from pydantic.error_wrappers import ValidationError
 from pydantic.main import BaseModel
 
 #
