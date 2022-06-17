@@ -9,10 +9,10 @@ from pycti.connector.new.libs.orchestrator_schemas import (
     Workflow as WorkflowSchema,
 )
 from pydantic import BaseModel, Field
-from flask import make_response, jsonify, current_app
+from flask import make_response, jsonify
 from app.core.workflow import launch_run_instance, verify_running_connectors
 from app.extensions import scheduler
-from app.core.models import Workflow, ErrorMessage, RunConfig, ConnectorInstance
+from app.core.models import Workflow, ErrorMessage
 
 tag = Tag(name="workflow", description="Workflow Management")
 
@@ -28,7 +28,7 @@ workflow_page = APIBlueprint(
 #     execution_type: ExecutionTypeEnum
 #     execution_args: Optional[str]
 # execution: {
-#   type: "schedule/triggered"
+#   type schedule / triggered
 #   schedule: "@hourly/23:11 @week/@now"
 # }
 
@@ -86,7 +86,7 @@ def post(body: WorkflowCreate):
 
     workflow = Workflow(**body.dict())
     try:
-        workflow_meta = workflow.save(return_doc_meta=True)
+        workflow.save(return_doc_meta=True)
     except ValidationException as e:
         return make_response(jsonify(message=str(e)), 400)
 
@@ -115,7 +115,7 @@ def update(path: WorkflowPath, body: WorkflowSchema):
     # workflow = Workflow(**body)
     workflow = Workflow.get(id=path.workflow_id)
     try:
-        workflow_meta = workflow.update(**body.dict())
+        workflow.update(**body.dict())
     except ValidationException as e:
         return make_response(jsonify(message=str(e)), 400)
 
@@ -126,10 +126,15 @@ def update(path: WorkflowPath, body: WorkflowSchema):
     "/<string:workflow_id>",
     summary="Delete workflow",
     description="Delete existing workflow",
-    # responses={"201": "", "404": ErrorMessage},
+    responses={"204": BaseModel, "404": ErrorMessage},
 )
 def delete(path: WorkflowPath):
-    pass
+    workflow = Workflow.get(id=path.workflow_id)
+    if not workflow:
+        return make_response(jsonify(message="Not Found"), 404)
+
+    workflow.delete()
+    return make_response(jsonify(), 204)
 
 
 @workflow_page.post(
@@ -168,5 +173,3 @@ def run(path: WorkflowPath, body: RunCreate):
         )
     else:
         return make_response(jsonify(message="Fail, unsupported execution type"), 400)
-
-    # return make_response(jsonify(message="Running"), 201)
