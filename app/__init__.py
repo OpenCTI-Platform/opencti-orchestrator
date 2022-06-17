@@ -31,7 +31,7 @@ def create_app(config_path: str, run_heartbeat: bool = True):
         elastic_logger = logging.getLogger("elasticsearch")
         elastic_logger.setLevel(logging.CRITICAL)
         schedule_logger = logging.getLogger("apscheduler")
-        schedule_logger.setLevel(logging.INFO)
+        schedule_logger.setLevel(logging.CRITICAL)
 
     initialize_extensions(app)
     register_blueprints(app)
@@ -58,7 +58,6 @@ def initialize_extensions(app):
 
 def shutdown(sender, **extra):
     from app.extensions import scheduler
-    from flask import current_app
 
     try:
         scheduler.shutdown()
@@ -103,6 +102,7 @@ def setup_heartbeat():
 @with_appcontext
 def recreate_db():
     from app.extensions import elastic
+    from flask import current_app
     from app.core.models import (
         Connector,
         RunConfig,
@@ -122,4 +122,4 @@ def recreate_db():
 
     elastic.connection.indices.refresh(index=INDEX_NAME)
 
-    print("Flushed database")
+    current_app.logger.info("Flushed database")
