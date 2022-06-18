@@ -1,6 +1,6 @@
 import pika as pika
 
-from pycti.connector.v2.libs.orchestrator_schemas import RunContainer
+from pycti.connector.new.libs.orchestrator_schemas import RunContainer
 from app.core.utils import BrokerClass
 
 

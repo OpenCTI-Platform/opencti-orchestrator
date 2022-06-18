@@ -1,8 +1,9 @@
 import json
+from typing import TypeVar
 
-from elasticsearch_dsl import Document, Date, Keyword, Object, InnerDoc, Nested, Integer
+from elasticsearch_dsl import Document, Keyword, Object, InnerDoc, Nested, Integer
 from pycti import ConnectorType
-from pycti.connector.v2.libs.orchestrator_schemas import (
+from pycti.connector.new.libs.orchestrator_schemas import (
     State,
     RunContainer,
     RunCreate,
@@ -19,13 +20,20 @@ from app import INDEX_NAME
 from app.core.crud import validate_model
 from app.extensions import elastic
 from app.modules.elasticsearch import ChoicesKeyword
-from pydantic import ValidationError
 
 connectorUniqueSchema = ["uuid", "name", "queue"]
 
 
 class ErrorMessage(BaseModel):
     message: str
+
+
+TBaseDocument = TypeVar("TBaseDocument", bound="BaseDocument")
+TConnector = TypeVar("TConnector", bound="Connector")
+TInstance = TypeVar("TInstance", bound="ConnectorInstance")
+TConfig = TypeVar("TConfig", bound="RunConfig")
+TRun = TypeVar("TRun", bound="Run")
+TWorkflow = TypeVar("TWorkflow", bound="Workflow")
 
 
 class BaseDocument(Document):
@@ -58,6 +66,28 @@ class BaseDocument(Document):
     def delete(self, using=None, index=None, **kwargs):
         return super(BaseDocument, self).delete(**kwargs, using=elastic.connection)
 
+    @classmethod
+    def _get_all(
+        cls, search, filters: list[dict] = None, queries: list[str] = None
+    ) -> list[TBaseDocument]:
+        if filters is None:
+            filters = []
+
+        if queries is None:
+            queries = []
+
+        for search_filter in filters:
+            search = search.filter("term", **search_filter)
+
+        for query in queries:
+            search = search.query("exists", field=query)
+
+        total = search.count()
+        search = search[0:total]
+        results = search.execute()
+
+        return results
+
     class Index:
         name = INDEX_NAME
 
@@ -80,6 +110,11 @@ class Connector(BaseDocument):
 
         return super(Connector, self).save(**kwargs)
 
+    @classmethod
+    def get_all(cls, filters: list[dict] = None) -> list[TConnector]:
+        unique = ["uuid"]
+        return BaseDocument._get_all(cls.search(), filters, unique)
+
 
 class ConnectorInstance(BaseDocument):
     last_seen = Integer(required=True)
@@ -88,6 +123,11 @@ class ConnectorInstance(BaseDocument):
 
     def to_orm(self):
         return InstanceSchema(**self.to_dict(include_meta=True))
+
+    @classmethod
+    def get_all(cls, filters: list[dict] = None) -> list[TInstance]:
+        unique = ["last_seen"]
+        return BaseDocument._get_all(cls.search(), filters, unique)
 
 
 connectorRunConfigUniqueSchema = ["name"]
@@ -102,7 +142,7 @@ class RunConfig(BaseDocument):
     def to_orm(self):
         return ConfigSchema(**self.to_dict(include_meta=True))
 
-    def save(self, **kwargs):
+    def save(self, **kwargs) -> BaseDocument:
         """
         Throws ValidationError if pydantic model is invalid
 
@@ -116,6 +156,11 @@ class RunConfig(BaseDocument):
             validate_model(json.dumps(config_schema.to_dict()), self.config.to_dict())
 
         return super(RunConfig, self).save(**kwargs)
+
+    @classmethod
+    def get_all(cls, filters: list[dict] = None) -> list[TConfig]:
+        unique = ["config"]
+        return BaseDocument._get_all(cls.search(), filters, unique)
 
 
 class JobStatus(InnerDoc):
@@ -161,6 +206,11 @@ class Run(BaseDocument):
     def to_orm(self):
         return RunSchema(**self.to_dict(include_meta=True))
 
+    @classmethod
+    def get_all(cls, filters: list[dict] = None) -> list[TRun]:
+        unique = ["workflow_id", "work_id"]
+        return BaseDocument._get_all(cls.search(), filters, unique)
+
 
 class Workflow(BaseDocument):
     # name = Keyword(required=True) # TODO make unique
@@ -193,6 +243,11 @@ class Workflow(BaseDocument):
 
     def to_orm(self):
         return WorkflowSchema(**self.to_dict(include_meta=True))
+
+    @classmethod
+    def get_all(cls, filters: list[dict] = None) -> list[TWorkflow]:
+        unique = ["jobs"]
+        return BaseDocument._get_all(cls.search(), filters, unique)
 
 
 # class Workflow(db.Model):

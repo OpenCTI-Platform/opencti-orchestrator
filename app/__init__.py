@@ -9,17 +9,8 @@ from apscheduler.schedulers import (
 )
 from app.modules.settings import FlaskSettings
 
-
-INDEX_NAME = "opencti_orchestrator"
-
-logging.basicConfig(level=logging.INFO)
-
-# TODO enable elasticsearch logging again when logging is set to DEBUG
 # TODO add verification that the index exists
-elastic_logger = logging.getLogger("elasticsearch")
-elastic_logger.setLevel(logging.CRITICAL)
-schedule_logger = logging.getLogger("apscheduler")
-schedule_logger.setLevel(logging.CRITICAL)
+INDEX_NAME = "opencti_orchestrator"
 
 
 def create_app(config_path: str, run_heartbeat: bool = True):
@@ -27,14 +18,27 @@ def create_app(config_path: str, run_heartbeat: bool = True):
         title="OpenCTI Orchestrator", version="1.0.0"
     )  # TODO get this version from setup.py
     app = OpenAPI(__name__, info=info)
+
     try:
         app.config.from_object(FlaskSettings(_yaml_file=config_path))
     except ValidationError as e:
         app.logger.error(e)
         return None
-        # better handling than None
 
-    initialize_extensions(app)
+    logging_level = app.config.get("LOGGING")
+    logging.basicConfig(level=logging_level)
+    if logging_level != "DEBUG_ALL":
+        elastic_logger = logging.getLogger("elasticsearch")
+        elastic_logger.setLevel(logging.CRITICAL)
+        schedule_logger = logging.getLogger("apscheduler")
+        schedule_logger.setLevel(logging.CRITICAL)
+
+    try:
+        initialize_extensions(app)
+    except ValueError as e:
+        app.logger.error(f"{e}")
+        return None
+
     register_blueprints(app)
     # appcontext_tearing_down.connect(shutdown)
     if run_heartbeat:
@@ -46,7 +50,10 @@ def create_app(config_path: str, run_heartbeat: bool = True):
 def initialize_extensions(app):
     from app.extensions import elastic, scheduler, broker
 
-    elastic.init_app(app)
+    try:
+        elastic.init_app(app)
+    except ValueError as e:
+        raise ValueError(f"Error to contact elasticsearch server {e}")
 
     try:
         scheduler.init_app(app)
@@ -54,12 +61,14 @@ def initialize_extensions(app):
     except SchedulerAlreadyRunningError as e:
         app.logger.info(f"Unable to start scheduler {e}")
 
-    broker.init_app(app)
+    try:
+        broker.init_app(app)
+    except Exception as e:
+        raise ValueError(f"Unable to start broker {e}")
 
 
 def shutdown(sender, **extra):
     from app.extensions import scheduler
-    from flask import current_app
 
     try:
         scheduler.shutdown()
@@ -104,6 +113,7 @@ def setup_heartbeat():
 @with_appcontext
 def recreate_db():
     from app.extensions import elastic
+    from flask import current_app
     from app.core.models import (
         Connector,
         RunConfig,
@@ -123,4 +133,4 @@ def recreate_db():
 
     elastic.connection.indices.refresh(index=INDEX_NAME)
 
-    print("Flushed database")
+    current_app.logger.info("Flushed database")

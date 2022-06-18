@@ -1,5 +1,5 @@
 from flask_openapi3 import APIBlueprint, Tag
-from pycti.connector.v2.libs.orchestrator_schemas import (
+from pycti.connector.new.libs.orchestrator_schemas import (
     Config as ConfigSchema,
     ConfigCreate,
 )
@@ -19,19 +19,19 @@ class ConfigPath(BaseModel):
     "/",
     summary="Get all Configs",
     description="Get all Configs",
-    responses={"201": ConfigSchema, "404": ErrorMessage},
+    responses={"200": ConfigSchema, "404": ErrorMessage},
 )
 def get_all():
-    configs = {}  # ConnectorRunConfig.query.all()
-    # TODO implement
-    return configs, 200  # connector_configs_schema.dumps(configs)
+    results = RunConfig.get_all()
+    results = [run.to_orm().dict() for run in results]
+    return make_response(jsonify(results, 200))
 
 
 @config_page.get(
     "/<string:config_id>",
     summary="Get Config",
     description="Get Config",
-    responses={"201": ConfigSchema, "404": ErrorMessage},
+    responses={"200": ConfigSchema, "404": ErrorMessage},
 )
 def get(path: ConfigPath):
     config = RunConfig.get(id=path.config_id)
@@ -61,7 +61,7 @@ def post(body: ConfigCreate):
     #     return f"{{'uuid': 'value \"{json_data['uuid']}\" already exists}}", 400
 
     try:
-        connector_config_meta = config.save(return_doc_meta=True)
+        config.save(return_doc_meta=True)
     # except ValidationException as e:
     #     return make_response(e, 442)
     except ValidationError as e:
@@ -89,7 +89,7 @@ def put(path: ConfigPath, body: ConfigCreate):
 
     config = RunConfig.get(id=path)
     try:
-        connector_config_meta = config.update(**body)
+        config.update(**body)
     except ValidationError as e:
         return make_response(e.json(), 422)
 

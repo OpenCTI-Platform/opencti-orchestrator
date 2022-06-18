@@ -1,4 +1,4 @@
-from typing import Optional, List, Tuple, Union
+from typing import List, Tuple, Union
 
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Keyword
@@ -22,19 +22,21 @@ class FlaskElasticsearch(object):
 
     def connect(self, kwargs) -> Elasticsearch:
         if isinstance(self.app.config.get("ELASTICSEARCH_URL"), str):
-            hosts = [self.app.config.get("ELASTICSEARCH_HOST")]
+            hosts = [self.app.config.get("ELASTICSEARCH_URL")]
         elif isinstance(self.app.config.get("ELASTICSEARCH_HOST"), list):
             hosts = self.app.config.get("ELASTICSEARCH_HOST")
         else:
             raise ValueError("No host defined")
 
-        # hosts = self.app.config.get("ELASTICSEARCH_HOST", None)
-        auth = (self.app.config.get("ELASTICSEARCH_HTTP_AUTH", None),)
+        # auth = (self.app.config.get("ELASTICSEARCH_HTTP_AUTH", None),)
         elastic = Elasticsearch(
             hosts=hosts,
             # http_auth=auth,
             **kwargs,
         )
+
+        if not elastic.ping():
+            raise ValueError("Elasticsearch connection failed")
 
         return elastic
 

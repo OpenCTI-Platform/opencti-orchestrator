@@ -2,10 +2,11 @@ import json
 import time
 
 from tests.utils.connector_creators import create_connector_and_config_stix
-from pycti.connector.v2.libs.orchestrator_schemas import Instance
+from pycti.connector.new.libs.orchestrator_schemas import Instance
+from app.extensions import scheduler
 
 
-def test_heartbeat(test_client, caplog):
+def test_heartbeat(test_client, init_database):
     config_id, connector_id, instance_id = create_connector_and_config_stix(test_client)
 
     # Check if available
@@ -14,8 +15,18 @@ def test_heartbeat(test_client, caplog):
     print(response.data.decode())
     instance = Instance(**json.loads(response.data.decode()))
     assert instance.status == "available"
-    # Just sleep longer than a heartbeat interval
-    time.sleep(10 + 3)  # 5 = heartbeat delay and 1 to avoid race condition
+
+    old_job_status = scheduler.get_job("heartbeat_service")
+    # If Job.next_run_time doesn't exist, try the command line
+    old_run_time = old_job_status.next_run_time
+    change = 0
+    # Wait for at least one finished job
+    while change < 3:
+        time.sleep(0.5)
+        new_run_time = scheduler.get_job("heartbeat_service").next_run_time
+        if new_run_time > old_run_time:
+            change += 1
+            old_run_time = new_run_time
 
     # Check if unavailable
     response = test_client.get(f"/heartbeat/{instance_id}")

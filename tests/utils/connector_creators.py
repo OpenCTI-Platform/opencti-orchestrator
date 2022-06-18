@@ -1,18 +1,10 @@
 import json
-import time
-import uuid
 from typing import List
-
-import pytest
-from elasticsearch_dsl import Search
 from pycti import ConnectorType
 from pydantic.main import BaseModel
 
-from pycti.connector.v2.libs.orchestrator_schemas import (
-    RunCreate,
+from pycti.connector.new.libs.orchestrator_schemas import (
     RunUpdate,
-    Run,
-    RunContainer,
     State,
     Result,
     WorkflowCreate,
@@ -36,7 +28,6 @@ def create_connector_and_config_stix(test_client) -> (str, str, str):
     )
     response = test_client.post("/connector/", json=stix_worker.dict())
     stix_worker = json.loads(response.data.decode())
-    print(stix_worker)
     assert response.status_code == 201, f"Error {response.data.decode()}"
 
     stix_worker_connector = Connector(**stix_worker["connector"])
@@ -66,7 +57,6 @@ def create_connector_and_config_external_import(test_client) -> (str, str, str):
     )
     response = test_client.post("/connector/", json=external_import.dict())
     external_import = json.loads(response.data.decode())
-    print(external_import)
     assert response.status_code == 201, f"Error {response.data.decode()}"
     instance_id = external_import["connector_instance"]
     external_import_connector = Connector(**external_import["connector"])
@@ -77,8 +67,6 @@ def create_connector_and_config_external_import(test_client) -> (str, str, str):
         name="EI Import",
         config=TestExternalImportRunConfig(ip="192.168.14.1"),
     )
-    a = external_import_config.dict()
-    print(f"sending config {a}")
     response = test_client.post("/config/", json=external_import_config.dict())
     assert response.status_code == 201, f"Error {response.data.decode()}"
     ei_config = Config(**json.loads(response.data.decode()))
@@ -123,5 +111,4 @@ def update_status(
         parameters={"config_id": config_id, "status": status, "result": result},
     )
     response = test_client.put(f"/run/{run_id}", json=update_schema.dict())
-    # print(response.data.decode())
     return response.status_code

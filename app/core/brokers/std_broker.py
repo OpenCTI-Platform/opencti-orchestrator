@@ -1,5 +1,5 @@
 from app.core.utils import BrokerClass
-from pycti.connector.v2.libs.orchestrator_schemas import RunContainer
+from pycti.connector.new.libs.orchestrator_schemas import RunContainer
 
 
 class StdBroker(BrokerClass):
