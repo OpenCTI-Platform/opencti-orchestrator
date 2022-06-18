@@ -53,7 +53,7 @@ def initialize_extensions(app):
     try:
         elastic.init_app(app)
     except ValueError as e:
-        raise ValueError("Error to contact elasticsearch server {e}")
+        raise ValueError(f"Error to contact elasticsearch server {e}")
 
     try:
         scheduler.init_app(app)
