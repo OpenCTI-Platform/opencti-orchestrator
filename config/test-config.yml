@@ -1,4 +1,3 @@
-LOGGING: "DEBUG"
 OPENCTI_URL: "https://opencti"
 ELASTICSEARCH_URL: "http://elasticsearch:9200"
 BROKER: "STDOUT"

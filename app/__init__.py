@@ -33,7 +33,12 @@ def create_app(config_path: str, run_heartbeat: bool = True):
         schedule_logger = logging.getLogger("apscheduler")
         schedule_logger.setLevel(logging.CRITICAL)
 
-    initialize_extensions(app)
+    try:
+        initialize_extensions(app)
+    except ValueError as e:
+        app.logger.error(f"{e}")
+        return None
+
     register_blueprints(app)
     # appcontext_tearing_down.connect(shutdown)
     if run_heartbeat:
@@ -45,7 +50,10 @@ def create_app(config_path: str, run_heartbeat: bool = True):
 def initialize_extensions(app):
     from app.extensions import elastic, scheduler, broker
 
-    elastic.init_app(app)
+    try:
+        elastic.init_app(app)
+    except ValueError as e:
+        raise ValueError("Error to contact elasticsearch server {e}")
 
     try:
         scheduler.init_app(app)
@@ -53,7 +61,10 @@ def initialize_extensions(app):
     except SchedulerAlreadyRunningError as e:
         app.logger.info(f"Unable to start scheduler {e}")
 
-    broker.init_app(app)
+    try:
+        broker.init_app(app)
+    except Exception as e:
+        raise ValueError(f"Unable to start broker {e}")
 
 
 def shutdown(sender, **extra):
